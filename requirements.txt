@@ -1,0 +1,17 @@
+# UAV-CD-APP — Phase 1 Dependencies
+# UI framework
+PyQt6>=6.7.0
+PyQt6-sip>=13.6.0
+pyqtgraph>=0.13.7
+
+# Scientific computing
+numpy>=2.0.0
+scipy>=1.13.0
+pandas>=2.2.0
+
+# Development
+pytest>=8.0.0
+pytest-qt>=4.4.0
+
+# Build
+pyinstaller>=6.0.0
