@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import (
     QFileDialog,
     QLabel,
@@ -115,26 +116,34 @@ class MainWindow(QMainWindow):
 
     # ── Menu ──────────────────────────────────────────────────────────────
 
+    def _action(self, text: str, slot, shortcut: str = "") -> QAction:
+        """Factory: create a QAction, connect slot, optionally set shortcut."""
+        act = QAction(text, self)
+        act.triggered.connect(slot)
+        if shortcut:
+            act.setShortcut(QKeySequence(shortcut))
+        return act
+
     def _build_menu(self) -> None:
         mb = self.menuBar()
 
         # File
         file_menu = mb.addMenu("&File")
-        file_menu.addAction("New Project",      self._new_project,   "Ctrl+N")
-        file_menu.addAction("Open Project…",    self._open_project,  "Ctrl+O")
+        file_menu.addAction(self._action("New Project",    self._new_project,  "Ctrl+N"))
+        file_menu.addAction(self._action("Open Project…",  self._open_project, "Ctrl+O"))
         file_menu.addSeparator()
-        file_menu.addAction("Save",             self._save,          "Ctrl+S")
-        file_menu.addAction("Save As…",         self._save_as,       "Ctrl+Shift+S")
+        file_menu.addAction(self._action("Save",           self._save,         "Ctrl+S"))
+        file_menu.addAction(self._action("Save As…",       self._save_as,      "Ctrl+Shift+S"))
         file_menu.addSeparator()
-        file_menu.addAction("Exit",             self.close,          "Alt+F4")
+        file_menu.addAction(self._action("Exit",           self.close,         "Alt+F4"))
 
         # View
         view_menu = mb.addMenu("&View")
-        view_menu.addAction("Toggle Dark/Light Theme", self._toggle_theme, "Ctrl+T")
+        view_menu.addAction(self._action("Toggle Dark/Light Theme", self._toggle_theme, "Ctrl+T"))
 
         # Help
         help_menu = mb.addMenu("&Help")
-        help_menu.addAction("About UAV-CD-APP", self._show_about)
+        help_menu.addAction(self._action("About UAV-CD-APP", self._show_about))
 
     # ── File actions ──────────────────────────────────────────────────────
 
