@@ -128,9 +128,12 @@ class SettingsTab(QWidget):
         db_form.addRow("CSV Path:", db_row)
         main.addWidget(db_box)
 
-        # ── Save button ───────────────────────────────────────────────────
+        # ── Save button + status ───────────────────────────────────────────
         save_row = QHBoxLayout()
         save_row.addStretch()
+        self._save_status = QLabel()
+        self._save_status.setObjectName("InputLabel")
+        save_row.addWidget(self._save_status)
         save_btn = QPushButton("Save Settings")
         save_btn.clicked.connect(self._save_settings)
         save_row.addWidget(save_btn)
@@ -159,6 +162,7 @@ class SettingsTab(QWidget):
             self._db_path.setText(path)
 
     def _save_settings(self) -> None:
+        from PyQt6.QtCore import QTimer
         s = self._store.settings
         new_s = dataclasses.replace(
             s,
@@ -174,3 +178,5 @@ class SettingsTab(QWidget):
             database_path=self._db_path.text(),
         )
         self._store.update_settings(new_s)
+        self._save_status.setText("✅  Settings saved")
+        QTimer.singleShot(3000, lambda: self._save_status.setText(""))

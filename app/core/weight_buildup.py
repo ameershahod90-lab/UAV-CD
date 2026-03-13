@@ -80,11 +80,6 @@ class _ElectricStrategy(_FuelFractionStrategy):
 
         # Battery mass [kg] = Energy / (e_specific [J/kg] * η_bat)
         e_j_per_kg: float = brief.battery_energy_density_wh_kg * 3_600.0
-        m_battery: float = energy_j / (
-            e_j_per_kg * brief.battery_efficiency * w_to_kg * _G
-        )
-        # m_battery is a fraction of W_TO (already divided by W_TO above? no →)
-        # Redo: fraction = m_bat / W_TO
         m_battery_kg: float = energy_j / (e_j_per_kg * brief.battery_efficiency)
         fraction: float = m_battery_kg / w_to_kg
         return max(0.0, min(fraction, 0.95))

@@ -2,13 +2,15 @@
 Sizing Input Tab — UAV-CD-APP
 ================================
 Design Brief input form: mission requirements, propulsion, aero coefficients.
+Reacts to settings_changed → refreshes unit labels on all input widgets.
+Run button shows visual feedback (disabled + text change) during computation.
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -25,11 +27,24 @@ from PyQt6.QtWidgets import (
 
 from app.core.entities import DesignBrief
 from app.core.enums import PropulsionType
-from app.core.validation import EntityValidator, FIELD_SPECS, get_field_spec
+from app.core.validation import EntityValidator, get_field_spec
 from app.state.store import AppStore
 from app.ui.widgets.enum_combo import EnumCombo
 from app.ui.widgets.slider_input import SliderInput
 from app.ui.widgets.validated_input import ValidatedInput
+
+
+# Mapping from brief field → settings attribute that provides the display unit
+# Only fields that have unit-specific display are listed here.
+_FIELD_UNIT_MAP: dict[str, str] = {
+    "payload_mass_kg":         "mass_unit",
+    "cruise_speed_ms":         "speed_unit",
+    "stall_speed_ms":          "speed_unit",
+    "max_speed_ms":            "speed_unit",
+    "service_ceiling_m":       "altitude_unit",
+    "cruise_altitude_m":       "altitude_unit",
+    "takeoff_run_m":           "altitude_unit",     # length, but altitude_unit covers m/ft
+}
 
 
 class InputTab(QWidget):
@@ -72,6 +87,7 @@ class InputTab(QWidget):
         mission_form.setSpacing(8)
 
         self._inputs: dict[str, ValidatedInput] = {}
+        self._input_labels: dict[str, QLabel] = {}  # for unit refresh
         mission_fields = [
             "payload_mass_kg", "cruise_speed_ms", "stall_speed_ms",
             "max_speed_ms", "range_km", "endurance_hr",
@@ -147,9 +163,14 @@ class InputTab(QWidget):
         aero_box.layout().addLayout(aero_layout)
         main.addWidget(aero_box)
 
-        # ── Run button ────────────────────────────────────────────────────
+        # ── Run button + status ───────────────────────────────────────────
         run_row = QHBoxLayout()
         run_row.addStretch()
+
+        self._status_label = QLabel()
+        self._status_label.setObjectName("InputLabel")
+        run_row.addWidget(self._status_label)
+
         self._run_btn = QPushButton("▶  Run Sizing Analysis")
         self._run_btn.setFixedHeight(38)
         self._run_btn.setMinimumWidth(200)
@@ -161,6 +182,12 @@ class InputTab(QWidget):
         # ── React to store ────────────────────────────────────────────────
         self._store.brief_changed.connect(self._on_store_brief_changed)
         self._store.classification_changed.connect(self._refresh_class_combo)
+        self._store.settings_changed.connect(self._on_settings_changed)
+        self._store.project_loaded.connect(self._on_project_loaded)
+        self._store.design_point_changed.connect(self._on_run_complete)
+        self._store.weight_result_changed.connect(
+            lambda: self._show_status("⏳  Weight converged, computing constraints…", 0)
+        )
 
     # ── Internal ─────────────────────────────────────────────────────────
 
@@ -186,7 +213,7 @@ class InputTab(QWidget):
 
     def _on_field_changed(self, field_name: str, value: float) -> None:
         self._store.update_brief_field(field_name, value)
-        # Validate
+        # Validate all fields
         errors = EntityValidator.validate(self._store.state.sizing.brief)
         error_map = {e.field_name: e.message for e in errors}
         for fn, widget in self._inputs.items():
@@ -200,17 +227,69 @@ class InputTab(QWidget):
 
     def _on_run(self) -> None:
         from app.services.sizing_service import SizingService
-        # Retrieve sizing service via QObject parent chain or app attribute
         app_root = self.window()
         svc = getattr(app_root, "_sizing_service", None)
         if svc and isinstance(svc, SizingService):
-            svc.run_now(save_to_history=True)
+            # Disable button and show feedback
+            self._run_btn.setEnabled(False)
+            self._run_btn.setText("⏳  Running…")
+            self._show_status("Running sizing pipeline…", 0)
+            # Process events so the button visually updates before computation
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+            success = svc.run_now(save_to_history=True)
+            if not success:
+                self._show_status("❌  Sizing failed — check console for details.", 5000)
+            self._run_btn.setEnabled(True)
+            self._run_btn.setText("▶  Run Sizing Analysis")
+
+    def _on_run_complete(self) -> None:
+        dp = self._store.state.sizing.design_point
+        if dp:
+            self._show_status(
+                f"✅  Done — MTOW = {dp.w_to_kg:.2f} kg  |  "
+                f"S = {dp.wing_area_m2:.4f} m²  |  b = {dp.wingspan_m:.3f} m",
+                8000,
+            )
+
+    def _show_status(self, text: str, timeout_ms: int) -> None:
+        self._status_label.setText(text)
+        if timeout_ms > 0:
+            QTimer.singleShot(timeout_ms, lambda: self._status_label.setText(""))
 
     def _on_store_brief_changed(self) -> None:
-        # Refresh class combo in case classification_name changed externally
         brief = self._store.state.sizing.brief
         idx = self._class_combo.findText(brief.classification_name)
         if idx >= 0:
             self._class_combo.blockSignals(True)
             self._class_combo.setCurrentIndex(idx)
             self._class_combo.blockSignals(False)
+
+    def _on_settings_changed(self) -> None:
+        """
+        Refresh unit labels on all applicable inputs when the user
+        changes display units in the Settings tab.
+
+        NOTE: Internal values remain in SI always. Only the label suffix
+        (displayed unit name) is updated here.
+        """
+        settings = self._store.settings
+        for fname, unit_attr in _FIELD_UNIT_MAP.items():
+            if fname in self._inputs:
+                unit_enum = getattr(settings, unit_attr, None)
+                if unit_enum is not None:
+                    unit_label = getattr(unit_enum, "label", str(unit_enum.value))
+                    widget = self._inputs[fname]
+                    # Update the suffix on the spin box
+                    widget.spin_box.setSuffix(f"  {unit_label}")
+
+    def _on_project_loaded(self) -> None:
+        """Refresh all widgets when a full project is loaded from disk."""
+        brief = self._store.state.sizing.brief
+        for fname, widget in self._inputs.items():
+            widget.set_value(getattr(brief, fname), block_signals=True)
+        for fname, slider in self._sliders.items():
+            slider.set_value(getattr(brief, fname))
+        self._prop_combo.set_value(brief.propulsion_type, block_signals=True)
+        self._refresh_class_combo()
+        self._on_settings_changed()  # also refresh unit labels

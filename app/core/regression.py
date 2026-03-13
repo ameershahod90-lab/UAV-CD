@@ -135,17 +135,14 @@ def fit_empty_weight_fraction(
     records: list[UavRecord],
 ) -> tuple[float, float, float]:
     """
-    Fit the linear empty-weight-fraction model:
-        W_E / W_TO = a * W_TO + b
+    Approximate empty-weight-fraction trend.
 
-    Parameters
-    ----------
-    records: List of UavRecord with non-None mtow_kg and enough entries.
-
-    Returns
-    -------
-    tuple (a, b, r2)
-        a: slope [1/kg], b: intercept [-]
+    .. warning::
+        The database does NOT have an explicit empty weight column.
+        ``(MTOW - payload)`` over-estimates empty weight because it
+        includes fuel/battery/avionics/systems.  This function exists
+        for exploratory plotting only — never use its output for
+        the sizing loop.  Use ``coefficients.py`` textbook values instead.
     """
     ewf_pairs: list[tuple[float, float]] = []
     for r in records:
@@ -153,8 +150,6 @@ def fit_empty_weight_fraction(
             continue
         if r.mtow_kg <= 0:
             continue
-        # Empty weight = MTOW - payload (structure + propulsion, no fuel term
-        # for sizing loop — fuel is computed separately)
         w_empty_approx = r.mtow_kg - r.payload_kg
         if w_empty_approx <= 0:
             continue
@@ -202,26 +197,35 @@ def compute_regression_coeffs(
 ) -> RegressionCoeffs:
     """
     Compute full RegressionCoeffs for *class_name* from *records*.
-    If insufficient data, returns textbook fallbacks.
+
+    Empty-weight-fraction (we_a, we_b) is ALWAYS taken from textbook
+    coefficients because the database has no explicit empty-weight column.
+    Only wingspan and wing-area power-law scaling are fitted to data.
     """
     from app.core.coefficients import get_closest_textbook
 
     mtow_records = [r for r in records if r.mtow_kg is not None]
 
-    if len(mtow_records) < MIN_SAMPLES:
-        midpoint: Optional[float] = None
-        if mtow_records:
-            vals = [r.mtow_kg for r in mtow_records if r.mtow_kg]
-            midpoint = float(np.median(vals)) if vals else None
-        return get_closest_textbook(class_name, midpoint)
+    # Textbook coefficients for EWF — always
+    midpoint: Optional[float] = None
+    if mtow_records:
+        vals = [r.mtow_kg for r in mtow_records if r.mtow_kg]
+        midpoint = float(np.median(vals)) if vals else None
+    textbook = get_closest_textbook(class_name, midpoint)
 
-    we_a, we_b, we_r2 = fit_empty_weight_fraction(mtow_records)
+    # If insufficient data, use textbook for everything
+    if len(mtow_records) < MIN_SAMPLES:
+        return textbook
+
+    # Fit geometry scaling from database, keep EWF from textbook
     b_coeff, b_exp, b_r2 = fit_wingspan_scaling(mtow_records)
     s_coeff, s_exp, s_r2 = fit_wing_area_scaling(mtow_records)
 
     return RegressionCoeffs(
         class_name=class_name,
-        we_a=we_a, we_b=we_b, we_r2=we_r2,
+        we_a=textbook.we_a,
+        we_b=textbook.we_b,
+        we_r2=0.0,  # not fitted — textbook
         b_coeff=b_coeff, b_exp=b_exp, b_r2=b_r2,
         s_coeff=s_coeff, s_exp=s_exp, s_r2=s_r2,
         sample_count=len(mtow_records),

@@ -162,27 +162,10 @@ class DatabaseService:
         records: list[UavRecord],
         cr: ClassificationRange,
     ) -> list[UavRecord]:
-        """Filter *records* to those within *cr* MTOW bounds."""
-        result: list[UavRecord] = []
-        for r in records:
-            if r.mtow_kg is None:
-                continue
-            if cr.contains(r.mtow_kg):
-                result.append(r)
-            elif r.mtow_kg >= cr.min_mtow_kg:
-                # Handle last-bin inclusive upper edge
-                result.append(r)
-        # De-duplicate
-        seen: set[str] = set()
-        deduped: list[UavRecord] = []
-        for r in result:
-            if r.name not in seen:
-                seen.add(r.name)
-                deduped.append(r)
-        # Re-filter strictly
+        """Filter *records* to those within *cr* MTOW range [min, max)."""
         return [
-            r for r in deduped
+            r for r in records
             if r.mtow_kg is not None
-            and (cr.contains(r.mtow_kg) or
-                 (r.mtow_kg >= cr.min_mtow_kg and r == deduped[-1]))
+            and r.mtow_kg >= cr.min_mtow_kg
+            and r.mtow_kg < cr.max_mtow_kg
         ]
