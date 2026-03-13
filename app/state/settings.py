@@ -88,6 +88,9 @@ class UserSettings:
     auto_recalculate: bool  = True
     plot_grid_visible: bool = True
 
+    # Historical data
+    use_historical_data: bool = True
+
     def add_recent(self, path: str) -> None:
         """Prepend *path* to recent_projects, capping at MAX_RECENT."""
         if path in self.recent_projects:
@@ -184,6 +187,7 @@ def _from_dict(data: dict[str, Any]) -> UserSettings:
     settings.max_iterations   = int(data.get("max_iterations", 100))
     settings.auto_recalculate = bool(data.get("auto_recalculate", True))
     settings.plot_grid_visible = bool(data.get("plot_grid_visible", True))
+    settings.use_historical_data = bool(data.get("use_historical_data", True))
 
     return settings
 

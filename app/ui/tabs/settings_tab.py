@@ -126,6 +126,15 @@ class SettingsTab(QWidget):
         db_row.addWidget(self._db_path, stretch=1)
         db_row.addWidget(browse_btn)
         db_form.addRow("CSV Path:", db_row)
+        self._use_hist = QCheckBox(
+            "Use historical data for regression (geometry scaling laws)"
+        )
+        self._use_hist.setToolTip(
+            "When unchecked, all regression coefficients use textbook values.\n"
+            "Useful when the database is small or incomplete."
+        )
+        self._use_hist.setChecked(s.use_historical_data)
+        db_form.addRow(self._use_hist)
         main.addWidget(db_box)
 
         # ── Save button + status ───────────────────────────────────────────
@@ -176,6 +185,7 @@ class SettingsTab(QWidget):
             max_iterations=self._max_iter.value(),
             auto_recalculate=self._auto_calc.isChecked(),
             database_path=self._db_path.text(),
+            use_historical_data=self._use_hist.isChecked(),
         )
         self._store.update_settings(new_s)
         self._save_status.setText("✅  Settings saved")

@@ -2,15 +2,19 @@
 Sizing Input Tab — UAV-CD-APP
 ================================
 Design Brief input form: mission requirements, propulsion, aero coefficients.
-Reacts to settings_changed → refreshes unit labels on all input widgets.
-Run button shows visual feedback (disabled + text change) during computation.
+
+Unit conversion:
+  - All internal values are SI.  ValidatedInput.value_changed always emits SI.
+  - When settings change, set_unit_converter() is called on each widget so
+    the spinbox value is recalculated (e.g. 25 m/s → 90 km/h) and the label
+    suffix updates to reflect the new unit name.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, Optional
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -27,6 +31,7 @@ from PyQt6.QtWidgets import (
 
 from app.core.entities import DesignBrief
 from app.core.enums import PropulsionType
+from app.core.units import UnitConverter
 from app.core.validation import EntityValidator, get_field_spec
 from app.state.store import AppStore
 from app.ui.widgets.enum_combo import EnumCombo
@@ -34,16 +39,27 @@ from app.ui.widgets.slider_input import SliderInput
 from app.ui.widgets.validated_input import ValidatedInput
 
 
-# Mapping from brief field → settings attribute that provides the display unit
-# Only fields that have unit-specific display are listed here.
-_FIELD_UNIT_MAP: dict[str, str] = {
-    "payload_mass_kg":         "mass_unit",
-    "cruise_speed_ms":         "speed_unit",
-    "stall_speed_ms":          "speed_unit",
-    "max_speed_ms":            "speed_unit",
-    "service_ceiling_m":       "altitude_unit",
-    "cruise_altitude_m":       "altitude_unit",
-    "takeoff_run_m":           "altitude_unit",     # length, but altitude_unit covers m/ft
+# ---------------------------------------------------------------------------
+# Field → conversion category mapping
+# ---------------------------------------------------------------------------
+
+# Each entry:  field_name → (settings_attr, to_display_func, to_si_func)
+# where the funcs take (si_val, unit_enum) or (display_val, unit_enum).
+
+def _make_converters(settings_attr: str,
+                     to_display: Callable,
+                     to_si: Callable) -> tuple[str, Callable, Callable]:
+    return (settings_attr, to_display, to_si)
+
+_FIELD_UNIT_INFO: dict[str, tuple[str, Callable, Callable]] = {
+    "payload_mass_kg":      _make_converters("mass_unit",     UnitConverter.mass_to_display,     UnitConverter.mass_to_si),
+    "cruise_speed_ms":      _make_converters("speed_unit",    UnitConverter.speed_to_display,    UnitConverter.speed_to_si),
+    "stall_speed_ms":       _make_converters("speed_unit",    UnitConverter.speed_to_display,    UnitConverter.speed_to_si),
+    "max_speed_ms":         _make_converters("speed_unit",    UnitConverter.speed_to_display,    UnitConverter.speed_to_si),
+    "rate_of_climb_ms":     _make_converters("speed_unit",    UnitConverter.speed_to_display,    UnitConverter.speed_to_si),
+    "service_ceiling_m":    _make_converters("altitude_unit", UnitConverter.altitude_to_display, UnitConverter.altitude_to_si),
+    "cruise_altitude_m":    _make_converters("altitude_unit", UnitConverter.altitude_to_display, UnitConverter.altitude_to_si),
+    "takeoff_run_m":        _make_converters("altitude_unit", UnitConverter.altitude_to_display, UnitConverter.altitude_to_si),
 }
 
 
@@ -70,7 +86,7 @@ class InputTab(QWidget):
         main.setContentsMargins(16, 16, 16, 16)
         main.setSpacing(16)
 
-        # ── Section: Classification ───────────────────────────────────────
+        # ── Classification ────────────────────────────────────────────────
         cls_box = self._make_group("UAV Classification")
         cls_form = QFormLayout()
         cls_form.setSpacing(8)
@@ -81,13 +97,12 @@ class InputTab(QWidget):
         cls_box.layout().addLayout(cls_form)
         main.addWidget(cls_box)
 
-        # ── Section: Mission Requirements ─────────────────────────────────
+        # ── Mission Requirements ──────────────────────────────────────────
         mission_box = self._make_group("Mission Requirements")
         mission_form = QFormLayout()
         mission_form.setSpacing(8)
 
         self._inputs: dict[str, ValidatedInput] = {}
-        self._input_labels: dict[str, QLabel] = {}  # for unit refresh
         mission_fields = [
             "payload_mass_kg", "cruise_speed_ms", "stall_speed_ms",
             "max_speed_ms", "range_km", "endurance_hr",
@@ -108,7 +123,7 @@ class InputTab(QWidget):
         mission_box.layout().addLayout(mission_form)
         main.addWidget(mission_box)
 
-        # ── Section: Propulsion ───────────────────────────────────────────
+        # ── Propulsion ────────────────────────────────────────────────────
         prop_box = self._make_group("Propulsion")
         prop_form = QFormLayout()
         prop_form.setSpacing(8)
@@ -137,7 +152,7 @@ class InputTab(QWidget):
         prop_box.layout().addLayout(prop_form)
         main.addWidget(prop_box)
 
-        # ── Section: Aero Coefficients (Sliders) ──────────────────────────
+        # ── Aero Coefficients ─────────────────────────────────────────────
         aero_box = self._make_group("Aerodynamic Coefficients")
         aero_layout = QVBoxLayout()
         aero_layout.setSpacing(12)
@@ -179,7 +194,7 @@ class InputTab(QWidget):
         main.addLayout(run_row)
         main.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        # ── React to store ────────────────────────────────────────────────
+        # ── Signals ───────────────────────────────────────────────────────
         self._store.brief_changed.connect(self._on_store_brief_changed)
         self._store.classification_changed.connect(self._refresh_class_combo)
         self._store.settings_changed.connect(self._on_settings_changed)
@@ -189,7 +204,10 @@ class InputTab(QWidget):
             lambda: self._show_status("⏳  Weight converged, computing constraints…", 0)
         )
 
-    # ── Internal ─────────────────────────────────────────────────────────
+        # Apply current unit settings on startup
+        self._apply_unit_converters()
+
+    # ── Helpers ──────────────────────────────────────────────────────────
 
     def _make_group(self, title: str) -> QGroupBox:
         box = QGroupBox(title)
@@ -208,12 +226,37 @@ class InputTab(QWidget):
                 self._class_combo.setCurrentIndex(i)
         self._class_combo.blockSignals(False)
 
+    # ── Unit conversion wiring ───────────────────────────────────────────
+
+    def _apply_unit_converters(self) -> None:
+        """
+        Wire current settings' unit enums into each ValidatedInput.
+        Called once at startup and on every settings_changed signal.
+        """
+        settings = self._store.settings
+        for fname, (settings_attr, to_disp_fn, to_si_fn) in _FIELD_UNIT_INFO.items():
+            if fname not in self._inputs:
+                continue
+            unit_enum = getattr(settings, settings_attr, None)
+            if unit_enum is None:
+                continue
+
+            # Build partial functions bound to the current unit enum
+            to_display = lambda si_val, fn=to_disp_fn, u=unit_enum: fn(si_val, u)
+            to_si      = lambda disp_val, fn=to_si_fn, u=unit_enum: fn(disp_val, u)
+            label = UnitConverter.label(unit_enum)
+
+            self._inputs[fname].set_unit_converter(to_display, to_si, label)
+
+    # ── Event handlers ───────────────────────────────────────────────────
+
     def _on_class_changed(self, name: str) -> None:
         self._store.update_brief_field("classification_name", name)
 
-    def _on_field_changed(self, field_name: str, value: float) -> None:
-        self._store.update_brief_field(field_name, value)
-        # Validate all fields
+    def _on_field_changed(self, field_name: str, si_value: float) -> None:
+        """Called with SI values (ValidatedInput always emits SI)."""
+        self._store.update_brief_field(field_name, si_value)
+        # Validate
         errors = EntityValidator.validate(self._store.state.sizing.brief)
         error_map = {e.field_name: e.message for e in errors}
         for fn, widget in self._inputs.items():
@@ -230,16 +273,14 @@ class InputTab(QWidget):
         app_root = self.window()
         svc = getattr(app_root, "_sizing_service", None)
         if svc and isinstance(svc, SizingService):
-            # Disable button and show feedback
             self._run_btn.setEnabled(False)
             self._run_btn.setText("⏳  Running…")
             self._show_status("Running sizing pipeline…", 0)
-            # Process events so the button visually updates before computation
             from PyQt6.QtWidgets import QApplication
             QApplication.processEvents()
             success = svc.run_now(save_to_history=True)
             if not success:
-                self._show_status("❌  Sizing failed — check console for details.", 5000)
+                self._show_status("❌  Sizing failed — check console.", 5000)
             self._run_btn.setEnabled(True)
             self._run_btn.setText("▶  Run Sizing Analysis")
 
@@ -266,30 +307,17 @@ class InputTab(QWidget):
             self._class_combo.blockSignals(False)
 
     def _on_settings_changed(self) -> None:
-        """
-        Refresh unit labels on all applicable inputs when the user
-        changes display units in the Settings tab.
-
-        NOTE: Internal values remain in SI always. Only the label suffix
-        (displayed unit name) is updated here.
-        """
-        settings = self._store.settings
-        for fname, unit_attr in _FIELD_UNIT_MAP.items():
-            if fname in self._inputs:
-                unit_enum = getattr(settings, unit_attr, None)
-                if unit_enum is not None:
-                    unit_label = getattr(unit_enum, "label", str(unit_enum.value))
-                    widget = self._inputs[fname]
-                    # Update the suffix on the spin box
-                    widget.spin_box.setSuffix(f"  {unit_label}")
+        """Recalculate all display values when units change."""
+        self._apply_unit_converters()
 
     def _on_project_loaded(self) -> None:
         """Refresh all widgets when a full project is loaded from disk."""
         brief = self._store.state.sizing.brief
+        # First apply unit converters (so set_value does correct conversion)
+        self._apply_unit_converters()
         for fname, widget in self._inputs.items():
             widget.set_value(getattr(brief, fname), block_signals=True)
         for fname, slider in self._sliders.items():
             slider.set_value(getattr(brief, fname))
         self._prop_combo.set_value(brief.propulsion_type, block_signals=True)
         self._refresh_class_combo()
-        self._on_settings_changed()  # also refresh unit labels

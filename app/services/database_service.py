@@ -106,6 +106,7 @@ class DatabaseService:
     def __init__(self, store: AppStore) -> None:
         self._store: AppStore = store
         store.classification_changed.connect(self.on_classification_changed)
+        store.settings_changed.connect(self.on_classification_changed)  # re-run on use_historical_data toggle
 
     def initialise(self, csv_path: Optional[str] = None) -> None:
         """
@@ -140,19 +141,24 @@ class DatabaseService:
         """
         For each classification range, filter DB records and compute
         regression coefficients. Push result to AppStore.
+
+        If ``settings.use_historical_data`` is False, passes an empty
+        record list so that ``compute_regression_coeffs()`` returns
+        textbook coefficients for every range.
         """
         ranges = self._store.state.historical_data.classification_ranges
-        all_fw = DatabaseLoader.get_fixed_wing()
+        use_db = self._store.settings.use_historical_data
+        all_fw = DatabaseLoader.get_fixed_wing() if use_db else []
         results: dict[str, RegressionCoeffs] = {}
 
         for cr in ranges:
-            records = self._filter_records(all_fw, cr)
+            records = self._filter_records(all_fw, cr) if use_db else []
             coeffs = compute_regression_coeffs(cr.name, records)
             results[cr.name] = coeffs
             _LOG.debug(
-                "Regression '%s': %d samples, source=%s, we_b=%.3f",
+                "Regression '%s': %d samples, source=%s, we_b=%.3f (use_db=%s)",
                 cr.name, coeffs.sample_count,
-                coeffs.data_source.value, coeffs.we_b,
+                coeffs.data_source.value, coeffs.we_b, use_db,
             )
 
         self._store.update_regression_coefficients(results)

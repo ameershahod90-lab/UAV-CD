@@ -2,18 +2,15 @@
 Constraints Tab — UAV-CD-APP
 ===============================
 Interactive matching diagram: W/S vs T/W (or W/P).
-Shows all constraint curves, the stall limit, the feasible region,
-the design point, and constraint violation banners.
 
-DRAGGABLE DESIGN POINT: The user can click-and-drag the gold star
-marker to any feasible position on the diagram. When released, the
-app recomputes wing geometry from the new W/S and W/P values and
-updates the AppStore.
+Design point interaction:
+  Click anywhere on the plot to move the design point to that location.
+  The app recomputes wing geometry and pushes the updated DesignPoint
+  to the AppStore, which propagates to the Output tab.
 """
 
 from __future__ import annotations
 
-import dataclasses
 import math
 from typing import Optional
 
@@ -27,61 +24,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from app.core.entities import (
-    ConstraintResult,
-    DesignPoint,
-    SanityCheck,
-)
-from app.core.enums import SanityCheckStatus
+from app.core.entities import DesignPoint
 from app.state.store import AppStore
 from app.ui.widgets.result_card import ResultCard
-
-
-class _DraggablePoint(pg.ScatterPlotItem):
-    """
-    A ScatterPlotItem that can be dragged with the mouse.
-    Emits sigPointMoved(x, y) when the user releases the mouse.
-    """
-
-    def __init__(self, x: float, y: float, **kwargs) -> None:
-        super().__init__(x=[x], y=[y], **kwargs)
-        self._dragging: bool = False
-        self._callback: Optional[object] = None
-
-    def set_on_moved(self, callback) -> None:
-        self._callback = callback
-
-    def mouseDragEvent(self, ev) -> None:
-        if ev.button() != Qt.MouseButton.LeftButton:
-            ev.ignore()
-            return
-
-        ev.accept()
-        if ev.isStart():
-            self._dragging = True
-        elif ev.isFinish():
-            self._dragging = False
-            # Get position in data coordinates
-            pos = ev.pos()
-            view_box = self.parentItem()
-            if view_box is not None:
-                scene_pos = ev.scenePos()
-                data_pos = view_box.mapSceneToView(scene_pos)
-                new_x, new_y = float(data_pos.x()), float(data_pos.y())
-                # Clamp to positive
-                new_x = max(1.0, new_x)
-                new_y = max(1e-6, new_y)
-                self.setData(x=[new_x], y=[new_y])
-                if self._callback:
-                    self._callback(new_x, new_y)
-        else:
-            if self._dragging:
-                pos = ev.pos()
-                view_box = self.parentItem()
-                if view_box is not None:
-                    scene_pos = ev.scenePos()
-                    data_pos = view_box.mapSceneToView(scene_pos)
-                    self.setData(x=[float(data_pos.x())], y=[float(data_pos.y())])
 
 
 class ConstraintsTab(QWidget):
@@ -90,7 +35,7 @@ class ConstraintsTab(QWidget):
     def __init__(self, store: AppStore, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._store: AppStore = store
-        self._dp_marker: Optional[_DraggablePoint] = None
+        self._dp_scatter: Optional[pg.ScatterPlotItem] = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -103,7 +48,8 @@ class ConstraintsTab(QWidget):
 
         # Instruction hint
         hint = QLabel(
-            "💡 Drag the ★ design point marker to explore alternative locations within the feasible region."
+            "💡 Click anywhere on the diagram to move the design point. "
+            "The sizing values update immediately."
         )
         hint.setObjectName("InputLabel")
         hint.setWordWrap(True)
@@ -123,6 +69,9 @@ class ConstraintsTab(QWidget):
         self._plot.setMinimumHeight(350)
         self._plot.addLegend(offset=(-20, 20))
         layout.addWidget(self._plot, stretch=1)
+
+        # Connect mouse click on the plot scene
+        self._plot.scene().sigMouseClicked.connect(self._on_plot_clicked)
 
         # ── Design point readout cards ────────────────────────────────────
         dp_label = QLabel("Design Point")
@@ -146,7 +95,7 @@ class ConstraintsTab(QWidget):
         self._store.design_point_changed.connect(self._on_design_point)
         self._store.constraint_violation.connect(self._on_violations)
 
-    # ── Internal ─────────────────────────────────────────────────────────
+    # ── Plot rendering ───────────────────────────────────────────────────
 
     def _on_constraint_result(self) -> None:
         result = self._store.state.sizing.constraint_result
@@ -154,7 +103,10 @@ class ConstraintsTab(QWidget):
             return
 
         self._plot.clear()
-        self._dp_marker = None  # cleared with plot
+        self._dp_scatter = None   # cleared with plot
+
+        # Re-add legend after clear
+        self._plot.addLegend(offset=(-20, 20))
 
         # Y axis label
         y_label = "W/P [N/W]" if result.is_power_loading_mode else "T/W [-]"
@@ -186,53 +138,58 @@ class ConstraintsTab(QWidget):
             return
 
         self._update_cards(dp)
+        self._place_marker(dp.wing_loading_nm2, dp.power_loading_nw)
 
-        # Remove old marker if exists
-        if self._dp_marker is not None:
-            self._plot.removeItem(self._dp_marker)
+    # ── Click-to-place ───────────────────────────────────────────────────
 
-        # Create draggable star marker
-        self._dp_marker = _DraggablePoint(
-            dp.wing_loading_nm2,
-            dp.power_loading_nw,
-            symbol="star",
-            size=22,
-            brush=pg.mkBrush("#f1c40f"),
-            pen=pg.mkPen("#b38f00", width=1.5),
-        )
-        self._dp_marker.set_on_moved(self._on_dp_dragged)
-        self._plot.addItem(self._dp_marker)
+    def _on_plot_clicked(self, event) -> None:
+        """Handle user clicking on the plot to move the design point."""
+        # Only respond to left-button clicks
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
 
-    def _on_dp_dragged(self, new_ws: float, new_loading: float) -> None:
-        """
-        Called when the user releases the dragged design point marker.
-        Recomputes geometry from the new W/S and W/P (or T/W) values.
-        """
+        # We need weight result to compute geometry
         wr = self._store.state.sizing.weight_result
         if wr is None:
             return
 
-        w_to_kg = wr.w_to_kg
+        # Convert scene pos → data coordinates
+        vb = self._plot.plotItem.vb
+        scene_pos = event.scenePos()
+        # Check the click is inside the plot area
+        if not vb.sceneBoundingRect().contains(scene_pos):
+            return
+
+        data_pos = vb.mapSceneToView(scene_pos)
+        new_ws = max(1.0, float(data_pos.x()))
+        new_loading = max(1e-6, float(data_pos.y()))
+
+        self._move_design_point(new_ws, new_loading)
+
+    def _move_design_point(self, new_ws: float, new_loading: float) -> None:
+        """Recompute geometry from new W/S and W/P, push to store."""
+        wr = self._store.state.sizing.weight_result
+        if wr is None:
+            return
+
         _G = 9.80665
+        w_to_kg = wr.w_to_kg
         weight_n = w_to_kg * _G
 
-        # Derive wing geometry from new W/S
+        # Wing geometry from new W/S
         wing_area = weight_n / new_ws if new_ws > 0 else 1.0
         brief = self._store.state.sizing.brief
         ar = brief.aspect_ratio
         wingspan = math.sqrt(wing_area * ar)
 
-        # Derive power / thrust
+        # Power / thrust
         cr = self._store.state.sizing.constraint_result
         is_power = cr.is_power_loading_mode if cr else True
         if is_power:
-            # new_loading = W/P [N/W], so P = W / (W/P)
             engine_power = weight_n / new_loading if new_loading > 0 else 0.0
         else:
-            # T/W, so T = (T/W) * W
             engine_power = new_loading * weight_n
 
-        # Create updated design point (no sanity checks for manual placement)
         new_dp = DesignPoint(
             wing_loading_nm2=new_ws,
             power_loading_nw=new_loading,
@@ -244,10 +201,26 @@ class ConstraintsTab(QWidget):
             sanity_checks=(),
         )
 
+        # Update cards immediately for responsive feel
         self._update_cards(new_dp)
-        # Update store (this will re-emit design_point_changed, but we've
-        # already placed the marker so _on_design_point will just refresh cards)
+        self._place_marker(new_ws, new_loading)
+
+        # Push to store (will also trigger _on_design_point)
         self._store.update_design_point(new_dp)
+
+    def _place_marker(self, x: float, y: float) -> None:
+        """Place or move the gold star design-point marker."""
+        if self._dp_scatter is not None:
+            self._dp_scatter.setData(x=[x], y=[y])
+        else:
+            self._dp_scatter = pg.ScatterPlotItem(
+                x=[x], y=[y],
+                symbol="star",
+                size=22,
+                brush=pg.mkBrush("#f1c40f"),
+                pen=pg.mkPen("#b38f00", width=1.5),
+            )
+            self._plot.addItem(self._dp_scatter)
 
     def _update_cards(self, dp: DesignPoint) -> None:
         """Populate result cards from a DesignPoint."""
