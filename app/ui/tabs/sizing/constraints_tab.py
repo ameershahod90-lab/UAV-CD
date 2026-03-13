@@ -3,10 +3,9 @@ Constraints Tab — UAV-CD-APP
 ===============================
 Interactive matching diagram: W/S vs T/W (or W/P).
 
-Design point interaction:
-  Click anywhere on the plot to move the design point to that location.
-  The app recomputes wing geometry and pushes the updated DesignPoint
-  to the AppStore, which propagates to the Output tab.
+All displayed values and axis labels use the current display units.
+Click anywhere on the diagram to move the design point.
+Reacts to settings_changed for live unit refresh.
 """
 
 from __future__ import annotations
@@ -24,6 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.core.display_converter import DisplayConverter
 from app.core.entities import DesignPoint
 from app.state.store import AppStore
 from app.ui.widgets.result_card import ResultCard
@@ -46,7 +46,6 @@ class ConstraintsTab(QWidget):
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
 
-        # Instruction hint
         hint = QLabel(
             "💡 Click anywhere on the diagram to move the design point. "
             "The sizing values update immediately."
@@ -55,7 +54,7 @@ class ConstraintsTab(QWidget):
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
-        # ── Violation banner (hidden by default) ──────────────────────────
+        # ── Violation banner ──────────────────────────────────────────────
         self._banner = QLabel()
         self._banner.setObjectName("AlertBanner")
         self._banner.setWordWrap(True)
@@ -70,7 +69,6 @@ class ConstraintsTab(QWidget):
         self._plot.addLegend(offset=(-20, 20))
         layout.addWidget(self._plot, stretch=1)
 
-        # Connect mouse click on the plot scene
         self._plot.scene().sigMouseClicked.connect(self._on_plot_clicked)
 
         # ── Design point readout cards ────────────────────────────────────
@@ -84,16 +82,22 @@ class ConstraintsTab(QWidget):
         self._card_wto  = ResultCard("MTOW", unit="kg")
         self._card_s    = ResultCard("Wing Area S", unit="m²")
         self._card_b    = ResultCard("Wingspan b", unit="m")
-        self._card_p    = ResultCard("Power / Thrust", unit="W or N")
+        self._card_p    = ResultCard("Power / Thrust", unit="W")
         for card in [self._card_ws, self._card_load, self._card_wto,
                      self._card_s, self._card_b, self._card_p]:
             dp_row.addWidget(card)
         layout.addLayout(dp_row)
 
-        # ── Signal connections ────────────────────────────────────────────
+        # ── Signals ───────────────────────────────────────────────────────
         self._store.constraint_result_changed.connect(self._on_constraint_result)
         self._store.design_point_changed.connect(self._on_design_point)
         self._store.constraint_violation.connect(self._on_violations)
+        self._store.settings_changed.connect(self._on_settings_changed)
+
+    # ── Helpers ──────────────────────────────────────────────────────────
+
+    def _dc(self) -> DisplayConverter:
+        return DisplayConverter(self._store.settings)
 
     # ── Plot rendering ───────────────────────────────────────────────────
 
@@ -102,33 +106,50 @@ class ConstraintsTab(QWidget):
         if result is None:
             return
 
-        self._plot.clear()
-        self._dp_scatter = None   # cleared with plot
+        dc = self._dc()
 
-        # Re-add legend after clear
+        self._plot.clear()
+        self._dp_scatter = None
         self._plot.addLegend(offset=(-20, 20))
 
-        # Y axis label
-        y_label = "W/P [N/W]" if result.is_power_loading_mode else "T/W [-]"
-        self._plot.setLabel("bottom", "Wing Loading W/S", units="N/m²")
+        # Axis labels with current units
+        _, ws_unit = dc.wing_loading(0)
+        if result.is_power_loading_mode:
+            _, pl_unit = dc.power_loading(0)
+            y_label = f"W/P [{pl_unit}]"
+        else:
+            y_label = "T/W [-]"
+
+        self._plot.setLabel("bottom", f"Wing Loading W/S [{ws_unit}]")
         self._plot.setLabel("left", y_label)
 
-        # Draw constraint curves
+        # Draw constraint curves (convert W/S axis to display units)
         for curve in result.curves:
             xs = np.asarray(curve.wing_loading_values)
             ys = np.asarray(curve.loading_values)
+            # Convert axes to display units
+            ws_display = np.array([dc.wing_loading(v)[0] for v in xs])
+            if result.is_power_loading_mode:
+                ld_display = np.array([dc.power_loading(v)[0] for v in ys])
+            else:
+                ld_display = ys
             pen = pg.mkPen(color=curve.color_hex, width=2)
-            self._plot.plot(xs, ys, pen=pen, name=curve.name)
+            self._plot.plot(ws_display, ld_display, pen=pen, name=curve.name)
 
         # Stall vertical line
-        stall_x = result.stall_ws_nm2
+        stall_x_disp = dc.wing_loading(result.stall_ws_nm2)[0]
         y_max = max(
             (max(c.loading_values) for c in result.curves if c.loading_values),
             default=1.0,
         )
+        if result.is_power_loading_mode:
+            y_max_disp = dc.power_loading(y_max)[0]
+        else:
+            y_max_disp = y_max
+
         stall_pen = pg.mkPen(color="#e74c3c", width=2, style=Qt.PenStyle.DashLine)
         self._plot.plot(
-            [stall_x, stall_x], [0, y_max * 1.1],
+            [stall_x_disp, stall_x_disp], [0, y_max_disp * 1.1],
             pen=stall_pen, name="Stall Limit",
         )
 
@@ -138,36 +159,72 @@ class ConstraintsTab(QWidget):
             return
 
         self._update_cards(dp)
-        self._place_marker(dp.wing_loading_nm2, dp.power_loading_nw)
+
+        dc = self._dc()
+        ws_disp = dc.wing_loading(dp.wing_loading_nm2)[0]
+        cr = self._store.state.sizing.constraint_result
+        is_power = cr.is_power_loading_mode if cr else True
+        if is_power:
+            ld_disp = dc.power_loading(dp.power_loading_nw)[0]
+        else:
+            ld_disp = dp.power_loading_nw
+
+        self._place_marker(ws_disp, ld_disp)
+
+    def _on_settings_changed(self) -> None:
+        """Re-render everything with new units."""
+        self._on_constraint_result()
+        self._on_design_point()
 
     # ── Click-to-place ───────────────────────────────────────────────────
 
     def _on_plot_clicked(self, event) -> None:
-        """Handle user clicking on the plot to move the design point."""
-        # Only respond to left-button clicks
         if event.button() != Qt.MouseButton.LeftButton:
             return
 
-        # We need weight result to compute geometry
         wr = self._store.state.sizing.weight_result
         if wr is None:
             return
 
-        # Convert scene pos → data coordinates
         vb = self._plot.plotItem.vb
         scene_pos = event.scenePos()
-        # Check the click is inside the plot area
         if not vb.sceneBoundingRect().contains(scene_pos):
             return
 
         data_pos = vb.mapSceneToView(scene_pos)
-        new_ws = max(1.0, float(data_pos.x()))
-        new_loading = max(1e-6, float(data_pos.y()))
+        click_ws_disp = float(data_pos.x())
+        click_ld_disp = float(data_pos.y())
 
-        self._move_design_point(new_ws, new_loading)
+        # Convert display coordinates back to SI
+        dc = self._dc()
+        # Reverse wing_loading conversion
+        from app.core.enums import AreaUnit
+        if self._store.settings.area_unit == AreaUnit.FT2:
+            new_ws_si = click_ws_disp / 0.020_885_4
+        else:
+            new_ws_si = click_ws_disp
+
+        # Reverse power_loading conversion
+        cr = self._store.state.sizing.constraint_result
+        is_power = cr.is_power_loading_mode if cr else True
+        from app.core.enums import PowerUnit
+        if is_power:
+            pu = self._store.settings.power_unit
+            if pu == PowerUnit.HP:
+                new_ld_si = click_ld_disp / 167.573
+            elif pu == PowerUnit.KW:
+                new_ld_si = click_ld_disp / 1000.0
+            else:
+                new_ld_si = click_ld_disp
+        else:
+            new_ld_si = click_ld_disp
+
+        new_ws_si = max(1.0, new_ws_si)
+        new_ld_si = max(1e-6, new_ld_si)
+
+        self._move_design_point(new_ws_si, new_ld_si)
 
     def _move_design_point(self, new_ws: float, new_loading: float) -> None:
-        """Recompute geometry from new W/S and W/P, push to store."""
         wr = self._store.state.sizing.weight_result
         if wr is None:
             return
@@ -176,13 +233,11 @@ class ConstraintsTab(QWidget):
         w_to_kg = wr.w_to_kg
         weight_n = w_to_kg * _G
 
-        # Wing geometry from new W/S
         wing_area = weight_n / new_ws if new_ws > 0 else 1.0
         brief = self._store.state.sizing.brief
         ar = brief.aspect_ratio
         wingspan = math.sqrt(wing_area * ar)
 
-        # Power / thrust
         cr = self._store.state.sizing.constraint_result
         is_power = cr.is_power_loading_mode if cr else True
         if is_power:
@@ -201,15 +256,10 @@ class ConstraintsTab(QWidget):
             sanity_checks=(),
         )
 
-        # Update cards immediately for responsive feel
         self._update_cards(new_dp)
-        self._place_marker(new_ws, new_loading)
-
-        # Push to store (will also trigger _on_design_point)
         self._store.update_design_point(new_dp)
 
     def _place_marker(self, x: float, y: float) -> None:
-        """Place or move the gold star design-point marker."""
         if self._dp_scatter is not None:
             self._dp_scatter.setData(x=[x], y=[y])
         else:
@@ -223,13 +273,21 @@ class ConstraintsTab(QWidget):
             self._plot.addItem(self._dp_scatter)
 
     def _update_cards(self, dp: DesignPoint) -> None:
-        """Populate result cards from a DesignPoint."""
-        self._card_ws.set_value(dp.wing_loading_nm2, decimals=1)
-        self._card_load.set_value(dp.power_loading_nw, decimals=5)
-        self._card_wto.set_value(dp.w_to_kg, decimals=3)
-        self._card_s.set_value(dp.wing_area_m2, decimals=4)
-        self._card_b.set_value(dp.wingspan_m, decimals=3)
-        self._card_p.set_value(dp.engine_power_w, decimals=1)
+        dc = self._dc()
+
+        ws_v, ws_u     = dc.wing_loading(dp.wing_loading_nm2)
+        ld_v, ld_u     = dc.power_loading(dp.power_loading_nw)
+        wto_v, wto_u   = dc.mass(dp.w_to_kg)
+        s_v, s_u       = dc.area(dp.wing_area_m2)
+        b_v, b_u       = dc.length(dp.wingspan_m)
+        p_v, p_u       = dc.power(dp.engine_power_w)
+
+        self._card_ws.set_value(ws_v, decimals=1);     self._card_ws.set_unit(ws_u)
+        self._card_load.set_value(ld_v, decimals=5);    self._card_load.set_unit(ld_u)
+        self._card_wto.set_value(wto_v, decimals=3);    self._card_wto.set_unit(wto_u)
+        self._card_s.set_value(s_v, decimals=4);        self._card_s.set_unit(s_u)
+        self._card_b.set_value(b_v, decimals=3);        self._card_b.set_unit(b_u)
+        self._card_p.set_value(p_v, decimals=1);        self._card_p.set_unit(p_u)
 
     def _on_violations(self, violations: list) -> None:
         if not violations:

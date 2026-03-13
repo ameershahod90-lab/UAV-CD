@@ -4,7 +4,7 @@ ResultCard Widget — UAV-CD-APP
 A read-only card displaying a computed result value with:
   - a label (parameter name)
   - a formatted value string
-  - an optional unit suffix
+  - a dynamic unit suffix (updated via set_unit)
   - an optional status indicator (for sanity checks)
 """
 
@@ -27,12 +27,14 @@ _STATUS_COLORS: dict[SanityCheckStatus, str] = {
 
 class ResultCard(QFrame):
     """
-    Compact read-only result card.
+    Compact read-only result card with dynamic unit label.
 
     Usage::
 
         card = ResultCard("MTOW", unit="kg")
         card.set_value(12.4)
+        card.set_unit("lb")           # changes unit label dynamically
+        card.set_value(27.3)          # re-set with new display value
         card.set_status(SanityCheckStatus.PASS)
     """
 
@@ -62,10 +64,11 @@ class ResultCard(QFrame):
         self._val_lbl.setObjectName("ResultCardValue")
         val_row.addWidget(self._val_lbl)
 
-        if unit:
-            self._unit_lbl = QLabel(unit)
-            self._unit_lbl.setObjectName("ResultCardUnit")
-            val_row.addWidget(self._unit_lbl)
+        self._unit_lbl = QLabel(unit)
+        self._unit_lbl.setObjectName("ResultCardUnit")
+        if not unit:
+            self._unit_lbl.hide()
+        val_row.addWidget(self._unit_lbl)
 
         val_row.addStretch()
 
@@ -82,6 +85,11 @@ class ResultCard(QFrame):
             self._val_lbl.setText("—")
         else:
             self._val_lbl.setText(f"{value:.{decimals}f}")
+
+    def set_unit(self, unit_label: str) -> None:
+        """Dynamically change the displayed unit label."""
+        self._unit_lbl.setText(unit_label)
+        self._unit_lbl.setVisible(bool(unit_label))
 
     def set_text(self, text: str) -> None:
         self._val_lbl.setText(text)

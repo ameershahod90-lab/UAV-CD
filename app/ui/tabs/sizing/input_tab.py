@@ -287,9 +287,14 @@ class InputTab(QWidget):
     def _on_run_complete(self) -> None:
         dp = self._store.state.sizing.design_point
         if dp:
+            from app.core.display_converter import DisplayConverter
+            dc = DisplayConverter(self._store.settings)
+            wto_v, wto_u = dc.mass(dp.w_to_kg)
+            s_v, s_u     = dc.area(dp.wing_area_m2)
+            b_v, b_u     = dc.length(dp.wingspan_m)
             self._show_status(
-                f"✅  Done — MTOW = {dp.w_to_kg:.2f} kg  |  "
-                f"S = {dp.wing_area_m2:.4f} m²  |  b = {dp.wingspan_m:.3f} m",
+                f"✅  Done — MTOW = {wto_v:.2f} {wto_u}  |  "
+                f"S = {s_v:.4f} {s_u}  |  b = {b_v:.3f} {b_u}",
                 8000,
             )
 

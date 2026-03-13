@@ -3,6 +3,9 @@ Weight Tab — UAV-CD-APP
 =========================
 Displays weight buildup results: summary cards, convergence history plot,
 and a weight breakdown pie chart.
+
+All mass/force values are displayed in the current display unit from
+settings (kg/lb). Reacts to settings_changed for live unit refresh.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.core.display_converter import DisplayConverter
 from app.state.store import AppStore
 from app.ui.widgets.result_card import ResultCard
 
@@ -46,8 +50,8 @@ class WeightTab(QWidget):
         self._card_wto   = ResultCard("MTOW", unit="kg")
         self._card_empty = ResultCard("Empty Weight", unit="kg")
         self._card_fb    = ResultCard("Fuel / Battery", unit="kg")
-        self._card_ewf   = ResultCard("Empty Weight Fraction", unit="-")
-        self._card_fbf   = ResultCard("Fuel/Battery Fraction", unit="-")
+        self._card_ewf   = ResultCard("Empty Weight Fraction", unit="—")
+        self._card_fbf   = ResultCard("Fuel/Battery Fraction", unit="—")
         self._card_iter  = ResultCard("Iterations")
 
         for i, card in enumerate([
@@ -72,29 +76,50 @@ class WeightTab(QWidget):
         layout.addWidget(self._conv_plot)
 
         # Connect to store
-        self._store.weight_result_changed.connect(self._on_weight_result)
+        self._store.weight_result_changed.connect(self._refresh)
+        self._store.settings_changed.connect(self._refresh)
 
     # ── Internal ─────────────────────────────────────────────────────────
 
-    def _on_weight_result(self) -> None:
+    def _dc(self) -> DisplayConverter:
+        return DisplayConverter(self._store.settings)
+
+    def _refresh(self) -> None:
         result = self._store.state.sizing.weight_result
         if result is None:
             return
 
-        self._card_wto.set_value(result.w_to_kg, decimals=3)
-        self._card_empty.set_value(result.w_empty_kg, decimals=3)
-        self._card_fb.set_value(result.w_fuel_or_battery_kg, decimals=3)
+        dc = self._dc()
+
+        # Mass cards — SI → display unit
+        wto_v, wto_u = dc.mass(result.w_to_kg)
+        emp_v, emp_u = dc.mass(result.w_empty_kg)
+        fb_v, fb_u   = dc.mass(result.w_fuel_or_battery_kg)
+
+        self._card_wto.set_value(wto_v, decimals=3)
+        self._card_wto.set_unit(wto_u)
+        self._card_empty.set_value(emp_v, decimals=3)
+        self._card_empty.set_unit(emp_u)
+        self._card_fb.set_value(fb_v, decimals=3)
+        self._card_fb.set_unit(fb_u)
+
+        # Fractions — dimensionless
         self._card_ewf.set_value(result.empty_weight_fraction, decimals=4)
         self._card_fbf.set_value(result.fuel_battery_fraction, decimals=4)
         self._card_iter.set_text(
             f"{result.iterations} {'✓' if result.converged else '⚠'}"
         )
 
-        # Convergence plot
+        # Convergence plot (always in display mass unit)
         self._conv_plot.clear()
         history = list(result.convergence_history)
         if len(history) >= 2:
-            xs = list(range(len(history)))
+            disp_history = [dc.mass(h)[0] for h in history]
+            xs = list(range(len(disp_history)))
             pen = pg.mkPen(color="#7c6af7", width=2)
-            self._conv_plot.plot(xs, history, pen=pen, symbol="o",
+            self._conv_plot.plot(xs, disp_history, pen=pen, symbol="o",
                                  symbolSize=5, symbolBrush="#7c6af7")
+
+        # Update plot axis label with current unit
+        _, mass_label = dc.mass(0)
+        self._conv_plot.setLabel("left", "W_TO", units=mass_label)
