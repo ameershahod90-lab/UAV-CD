@@ -92,9 +92,9 @@ QLabel#SectionTitle {
 QLabel#InputLabel       { color: #888aaa; font-size: 12px; }
 QLabel#SliderLabel      { color: #888aaa; font-size: 12px; }
 QLabel#SliderValueLabel { color: #e0e0f0; font-size: 12px; font-weight: 600; }
-QLabel#ResultCardLabel  { color: #888aaa; font-size: 11px; text-transform: uppercase; }
-QLabel#ResultCardValue  { color: #e0e0f0; font-size: 18px; font-weight: 700; }
-QLabel#ResultCardUnit   { color: #888aaa; font-size: 13px; margin-bottom: 4px; }
+QLabel#ResultCardLabel  { color: #888aaa; font-size: 11px; text-transform: uppercase; background: transparent; }
+QLabel#ResultCardValue  { color: #e0e0f0; font-size: 18px; font-weight: 700; background: transparent; }
+QLabel#ResultCardUnit   { color: #888aaa; font-size: 13px; margin-bottom: 4px; background: transparent; }
 QLabel#ErrorLabel       { color: #e74c3c; font-size: 11px; }
 QLabel#AlertBanner      {
     background-color: #3d1a1a;
@@ -332,9 +332,9 @@ QLabel#SectionTitle {
 QLabel#InputLabel    { color: #666688; font-size: 12px; }
 QLabel#SliderLabel   { color: #666688; font-size: 12px; }
 QLabel#SliderValueLabel { color: #1a1a2e; font-size: 12px; font-weight: 600; }
-QLabel#ResultCardLabel  { color: #888aaa; font-size: 11px; text-transform: uppercase; }
-QLabel#ResultCardValue  { color: #1a1a2e; font-size: 18px; font-weight: 700; }
-QLabel#ResultCardUnit   { color: #888aaa; font-size: 13px; margin-bottom: 4px; }
+QLabel#ResultCardLabel  { color: #888aaa; font-size: 11px; text-transform: uppercase; background: transparent; }
+QLabel#ResultCardValue  { color: #1a1a2e; font-size: 18px; font-weight: 700; background: transparent; }
+QLabel#ResultCardUnit   { color: #888aaa; font-size: 13px; margin-bottom: 4px; background: transparent; }
 QLabel#ErrorLabel       { color: #e74c3c; font-size: 11px; }
 
 QDoubleSpinBox, QSpinBox, QLineEdit, QTextEdit {

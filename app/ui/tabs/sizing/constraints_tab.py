@@ -78,7 +78,7 @@ class ConstraintsTab(QWidget):
 
         dp_row = QHBoxLayout()
         self._card_ws   = ResultCard("W/S", unit="N/m²")
-        self._card_load = ResultCard("W/P or T/W", unit="—")
+        self._card_load = ResultCard("W/P", unit="N/W")   # updated dynamically
         self._card_wto  = ResultCard("MTOW", unit="kg")
         self._card_s    = ResultCard("Wing Area S", unit="m²")
         self._card_b    = ResultCard("Wingspan b", unit="m")
@@ -93,6 +93,7 @@ class ConstraintsTab(QWidget):
         self._store.design_point_changed.connect(self._on_design_point)
         self._store.constraint_violation.connect(self._on_violations)
         self._store.settings_changed.connect(self._on_settings_changed)
+        self._store.brief_changed.connect(self._on_brief_changed)  # for T/W vs W/P
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
@@ -176,6 +177,23 @@ class ConstraintsTab(QWidget):
         self._on_constraint_result()
         self._on_design_point()
 
+    def _on_brief_changed(self) -> None:
+        """Update loading card label when propulsion type changes."""
+        self._update_loading_card_label()
+
+    def _update_loading_card_label(self) -> None:
+        """Dynamic T/W (thrust) vs W/P (power) label based on propulsion type."""
+        from app.core.enums import PowerUnit
+        brief = self._store.state.sizing.brief
+        cr = self._store.state.sizing.constraint_result
+        is_power = cr.is_power_loading_mode if cr else brief.propulsion_type.is_electric
+        dc = self._dc()
+        if is_power:
+            _, ld_unit = dc.power_loading(0)
+            self._card_load._lbl.setText(f"W/P [{ld_unit}]")
+        else:
+            self._card_load._lbl.setText("T/W [—]")
+
     # ── Click-to-place ───────────────────────────────────────────────────
 
     def _on_plot_clicked(self, event) -> None:
@@ -245,6 +263,11 @@ class ConstraintsTab(QWidget):
         else:
             engine_power = new_loading * weight_n
 
+        # Carry over sanity checks from the last full pipeline run
+        # so the OutputTab sanity-checks table is not cleared on manual DP move.
+        prev_dp = self._store.state.sizing.design_point
+        carried_sanity = prev_dp.sanity_checks if prev_dp is not None else ()
+
         new_dp = DesignPoint(
             wing_loading_nm2=new_ws,
             power_loading_nw=new_loading,
@@ -253,7 +276,7 @@ class ConstraintsTab(QWidget):
             wingspan_m=wingspan,
             aspect_ratio=ar,
             engine_power_w=engine_power,
-            sanity_checks=(),
+            sanity_checks=carried_sanity,
         )
 
         self._update_cards(new_dp)
