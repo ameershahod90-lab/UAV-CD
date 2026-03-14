@@ -125,20 +125,24 @@ class InputTab(QWidget):
 
         # ── Propulsion ────────────────────────────────────────────────────
         prop_box = self._make_group("Propulsion")
-        prop_form = QFormLayout()
-        prop_form.setSpacing(8)
+        prop_layout = QVBoxLayout()
+        prop_layout.setSpacing(8)
 
+        # Propulsion type selector
+        type_row = QFormLayout()
+        type_row.setSpacing(8)
         self._prop_combo = EnumCombo(PropulsionType)
         self._prop_combo.set_value(self._store.state.sizing.brief.propulsion_type, block_signals=True)
         self._prop_combo.enum_changed.connect(self._on_propulsion_changed)
-        prop_form.addRow("Propulsion Type:", self._prop_combo)
+        type_row.addRow("Propulsion Type:", self._prop_combo)
+        prop_layout.addLayout(type_row)
 
-        prop_fields = [
-            "battery_energy_density_wh_kg",
-            "battery_efficiency",
-            "specific_fuel_consumption_g_wh",
-        ]
-        for fname in prop_fields:
+        # ── Battery fields (Electric / Hybrid) ────────────────
+        self._battery_group = QGroupBox("⚡ Battery Parameters")
+        self._battery_group.setObjectName("PropSubGroup")
+        bat_form = QFormLayout(self._battery_group)
+        bat_form.setSpacing(8)
+        for fname in ["battery_energy_density_wh_kg", "battery_efficiency"]:
             spec = get_field_spec(DesignBrief, fname)
             if spec:
                 widget = ValidatedInput(spec)
@@ -147,10 +151,34 @@ class InputTab(QWidget):
                     lambda val, f=fname: self._on_field_changed(f, val)
                 )
                 self._inputs[fname] = widget
-                prop_form.addRow(widget)
+                bat_form.addRow(widget)
+        prop_layout.addWidget(self._battery_group)
 
-        prop_box.layout().addLayout(prop_form)
+        # ── Fuel / SFC fields (Piston / Turboprop / Hybrid) ───
+        self._fuel_group = QGroupBox("⛽ Fuel Parameters")
+        self._fuel_group.setObjectName("PropSubGroup")
+        fuel_form = QFormLayout(self._fuel_group)
+        fuel_form.setSpacing(8)
+        sfc_spec = get_field_spec(DesignBrief, "specific_fuel_consumption_g_wh")
+        if sfc_spec:
+            sfc_widget = ValidatedInput(sfc_spec)
+            sfc_widget.set_value(
+                self._store.state.sizing.brief.specific_fuel_consumption_g_wh,
+                block_signals=True,
+            )
+            sfc_widget.value_changed.connect(
+                lambda val: self._on_field_changed("specific_fuel_consumption_g_wh", val)
+            )
+            self._inputs["specific_fuel_consumption_g_wh"] = sfc_widget
+            fuel_form.addRow(sfc_widget)
+        prop_layout.addWidget(self._fuel_group)
+
+        prop_box.layout().addLayout(prop_layout)
         main.addWidget(prop_box)
+
+        # Apply initial visibility
+        self._update_propulsion_visibility(self._store.state.sizing.brief.propulsion_type)
+
 
         # ── Aero Coefficients ─────────────────────────────────────────────
         aero_box = self._make_group("Aerodynamic Coefficients")
@@ -267,6 +295,13 @@ class InputTab(QWidget):
 
     def _on_propulsion_changed(self, pt: PropulsionType) -> None:
         self._store.update_brief_field("propulsion_type", pt)
+        self._update_propulsion_visibility(pt)
+
+    def _update_propulsion_visibility(self, pt: PropulsionType) -> None:
+        """Show/hide propulsion-specific parameter groups based on type."""
+        self._battery_group.setVisible(pt.is_electric)
+        self._fuel_group.setVisible(pt.uses_fuel)
+
 
     def _on_run(self) -> None:
         from app.services.sizing_service import SizingService
@@ -325,4 +360,6 @@ class InputTab(QWidget):
         for fname, slider in self._sliders.items():
             slider.set_value(getattr(brief, fname))
         self._prop_combo.set_value(brief.propulsion_type, block_signals=True)
+        self._update_propulsion_visibility(brief.propulsion_type)
         self._refresh_class_combo()
+
