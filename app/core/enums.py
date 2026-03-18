@@ -21,6 +21,7 @@ class PropulsionType(Enum):
     PISTON = "Piston"
     TURBOPROP = "Turboprop"
     HYBRID = "Hybrid"
+    TURBOJET = "Turbojet"
 
     @property
     def label(self) -> str:
@@ -32,8 +33,15 @@ class PropulsionType(Enum):
 
     @property
     def uses_fuel(self) -> bool:
-        return self in (PropulsionType.PISTON, PropulsionType.TURBOPROP, PropulsionType.HYBRID)
+        return self in (PropulsionType.PISTON, PropulsionType.TURBOPROP, PropulsionType.HYBRID, PropulsionType.TURBOJET)
 
+    @property
+    def is_power_mode(self) -> bool:
+        return self in (PropulsionType.ELECTRIC, PropulsionType.PISTON, PropulsionType.TURBOPROP, PropulsionType.HYBRID)
+    
+    @property
+    def power_source(self) -> str:
+        return 'FUEL + BATTERY' if (self.is_electric and self.uses_fuel) else ('FUEL' if self.uses_fuel else 'BATTERY')
 
 # ---------------------------------------------------------------------------
 # Unit System Enums

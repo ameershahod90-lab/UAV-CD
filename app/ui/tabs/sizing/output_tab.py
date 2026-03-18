@@ -55,6 +55,8 @@ class OutputTab(QWidget):
         grid = QGridLayout()
         grid.setSpacing(10)
 
+        is_power = self._store.state.sizing.brief.propulsion_type.is_power_mode
+
         # Cards keyed by internal field name
         # (key, label, initial_unit, decimals)
         self._dp_field_defs: list[tuple[str, str, str, int]] = [
@@ -62,7 +64,7 @@ class OutputTab(QWidget):
             ("wing_area_m2",     "Wing Area S",     "m²",   4),
             ("wingspan_m",       "Wingspan b",      "m",    3),
             ("aspect_ratio",     "AR",              "—",    2),
-            ("engine_power_w",   "Power / Thrust",  "W",    1),
+            ("engine_power_w",   "Power" if is_power else "Thrust",  self._dc().power(0)[1] if is_power else self._dc().force(0)[1],    1),
             ("wing_loading_nm2", "W/S",             "N/m²", 1),
         ]
         self._dp_cards: dict[str, ResultCard] = {}
@@ -128,27 +130,31 @@ class OutputTab(QWidget):
 
         dc = self._dc()
 
+        is_power = self._store.state.sizing.brief.propulsion_type.is_power_mode
+
         # Map each field to its converted (value, unit, decimals)
         wto_v, wto_u     = dc.mass(dp.w_to_kg)
         area_v, area_u   = dc.area(dp.wing_area_m2)
         span_v, span_u   = dc.length(dp.wingspan_m)
-        pwr_v, pwr_u     = dc.power(dp.engine_power_w)
+        pwr_v, pwr_u     = dc.power(dp.engine_power_w) if is_power else dc.force(dp.engine_power_w)
         ws_v, ws_u       = dc.wing_loading(dp.wing_loading_nm2)
 
-        display_map: dict[str, tuple[float, str, int]] = {
-            "w_to_kg":          (wto_v,             wto_u,  3),
-            "wing_area_m2":     (area_v,            area_u, 4),
-            "wingspan_m":       (span_v,            span_u, 3),
-            "aspect_ratio":     (dp.aspect_ratio,   "—",    2),
-            "engine_power_w":   (pwr_v,             pwr_u,  1),
-            "wing_loading_nm2": (ws_v,              ws_u,   1),
+        display_map: dict[str, tuple[str | None, float, str, int]] = {
+            "w_to_kg":          (None, wto_v,             wto_u,  3),
+            "wing_area_m2":     (None, area_v,            area_u, 4),
+            "wingspan_m":       (None, span_v,            span_u, 3),
+            "aspect_ratio":     (None, dp.aspect_ratio,   "—",    2),
+            "engine_power_w":   ("Power" if is_power else "Thrust", pwr_v,             pwr_u,  1),
+            "wing_loading_nm2": (None, ws_v,              ws_u,   1),
         }
 
-        for key, (val, unit, dec) in display_map.items():
+        for key, (lbl, val, unit, dec) in display_map.items():
             card = self._dp_cards.get(key)
             if card:
                 card.set_value(val, decimals=dec)
                 card.set_unit(unit)
+                if lbl:
+                    card._lbl.setText(lbl)
 
         # Sanity checks
         self._sanity_table.setRowCount(0)

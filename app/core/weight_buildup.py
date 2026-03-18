@@ -132,6 +132,7 @@ _STRATEGY_MAP: dict[PropulsionType, _FuelFractionStrategy] = {
     PropulsionType.ELECTRIC:  _ElectricStrategy(),
     PropulsionType.PISTON:    _ICEngineStrategy(),
     PropulsionType.TURBOPROP: _ICEngineStrategy(),
+    PropulsionType.TURBOJET: _ICEngineStrategy(),
     PropulsionType.HYBRID:    _HybridStrategy(),
 }
 

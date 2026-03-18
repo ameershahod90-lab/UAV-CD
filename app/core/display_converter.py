@@ -81,9 +81,13 @@ class DisplayConverter:
 
     def power_to_si(self, display_val: float) -> float:
         return UnitConverter.power_to_si(display_val, self._settings.power_unit)
-
+    
     def force(self, si_n: float) -> tuple[float, str]:
-        return si_n, "N"   # force display not yet configurable
+        u = self._settings.force_unit
+        return UnitConverter.force_to_display(si_n, u), u.value
+
+    def force_to_si(self, display_val: float) -> float:
+        return UnitConverter.force_to_si(display_val, self._settings.force_unit)    
 
     def length(self, si_m: float) -> tuple[float, str]:
         """Length uses altitude_unit by default (m / ft)."""
@@ -100,24 +104,28 @@ class DisplayConverter:
 
     def wing_loading(self, si_nm2: float) -> tuple[float, str]:
         """Convert wing loading N/m² to display units."""
-        area_u = self._settings.area_unit
-        if area_u == AreaUnit.FT2:
-            # Convert N/m² → lbf/ft²
-            val = si_nm2 * 0.020_885_4  # 1 N/m² = 0.0208854 lbf/ft²
-            return val, "lbf/ft²"
-        return si_nm2, "N/m²"
+        s_conv, s_unit = self.area(1)
+        f_conv, f_unit = self.force(1)
+
+        return si_nm2 * f_conv / s_conv, f"{f_unit}/{s_unit}"
 
     # ── Power loading (N/W → depends on power unit) ──────────────────────
 
     def power_loading(self, si_nw: float) -> tuple[float, str]:
         """Power loading N/W stays as-is; unit label reflects power unit."""
-        pu = self._settings.power_unit
-        if pu == PowerUnit.HP:
-            # N/W → lbf/hp (multiply by 745.7/4.448)
-            return si_nw * 167.573, "lbf/hp"
-        if pu == PowerUnit.KW:
-            return si_nw * 1000.0, "N/kW"
-        return si_nw, "N/W"
+        p_conv, p_unit = self.power(1)
+        f_conv, f_unit = self.force(1)
+        
+        return si_nw * f_conv / p_conv, f"{f_unit}/{p_unit}"
+    
+    # ── Force loading (N/N → depends on force unit) ──────────────────────
+
+    def force_loading(self, si_nn: float) -> tuple[float, str]:
+        """Force loading N/N stays as-is; unit label reflects force unit."""
+        fu = self._settings.force_unit
+        if fu == ForceUnit.NEWTON:
+            return si_nn, "N/N"
+        return si_nn, "lbf/lbf"
 
     # ── Convenience: formatted string ─────────────────────────────────────
 

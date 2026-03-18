@@ -77,9 +77,7 @@ class ConstraintAnalyzer:
         self._rho_sl: float = AtmosphereModel.density_at(0.0)
         self._rho_cruise: float = AtmosphereModel.density_at(b.cruise_altitude_m)
         self._rho_ceiling: float = AtmosphereModel.density_at(b.service_ceiling_m)
-        self._is_power_mode: bool = brief.propulsion_type in (
-            PropulsionType.ELECTRIC, PropulsionType.PISTON
-        )
+        self._is_power_mode: bool = brief.propulsion_type.is_power_mode
 
     # ── Public API ───────────────────────────────────────────────────────
 

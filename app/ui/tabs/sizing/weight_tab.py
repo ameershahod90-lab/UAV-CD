@@ -49,9 +49,9 @@ class WeightTab(QWidget):
 
         self._card_wto   = ResultCard("MTOW", unit="kg")
         self._card_empty = ResultCard("Empty Weight", unit="kg")
-        self._card_fb    = ResultCard("Fuel / Battery", unit="kg")
+        self._card_fb    = ResultCard(self._store.state.sizing.brief.propulsion_type.power_source, unit="kg")
         self._card_ewf   = ResultCard("Empty Weight Fraction", unit="—")
-        self._card_fbf   = ResultCard("Fuel/Battery Fraction", unit="—")
+        self._card_fbf   = ResultCard(f"{self._store.state.sizing.brief.propulsion_type.power_source} Fraction", unit="—")
         self._card_iter  = ResultCard("Iterations")
 
         for i, card in enumerate([
@@ -100,11 +100,13 @@ class WeightTab(QWidget):
         self._card_wto.set_unit(wto_u)
         self._card_empty.set_value(emp_v, decimals=3)
         self._card_empty.set_unit(emp_u)
+        self._card_fb._lbl.setText(self._store.state.sizing.brief.propulsion_type.power_source)
         self._card_fb.set_value(fb_v, decimals=3)
         self._card_fb.set_unit(fb_u)
 
         # Fractions — dimensionless
         self._card_ewf.set_value(result.empty_weight_fraction, decimals=4)
+        self._card_fbf._lbl.setText(f"{self._store.state.sizing.brief.propulsion_type.power_source} Fraction")
         self._card_fbf.set_value(result.fuel_battery_fraction, decimals=4)
         self._card_iter.set_text(
             f"{result.iterations} {'✓' if result.converged else '⚠'}"

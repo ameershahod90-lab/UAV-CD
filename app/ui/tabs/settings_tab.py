@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 from app.core.enums import (
     AltitudeUnit,
     AreaUnit,
+    ForceUnit,
     MassUnit,
     PowerUnit,
     SpeedUnit,
@@ -86,6 +87,7 @@ class SettingsTab(QWidget):
         self._mass_u    = EnumCombo(MassUnit)
         self._area_u    = EnumCombo(AreaUnit)
         self._power_u   = EnumCombo(PowerUnit)
+        self._force_u   = EnumCombo(ForceUnit)
 
         self._unit_sys.set_value(s.unit_system, block_signals=True)
         self._speed_u.set_value(s.speed_unit, block_signals=True)
@@ -93,6 +95,7 @@ class SettingsTab(QWidget):
         self._mass_u.set_value(s.mass_unit, block_signals=True)
         self._area_u.set_value(s.area_unit, block_signals=True)
         self._power_u.set_value(s.power_unit, block_signals=True)
+        self._force_u.set_value(s.force_unit, block_signals=True)
 
         units_form.addRow("Unit System:", self._unit_sys)
         units_form.addRow("Speed:", self._speed_u)
@@ -100,6 +103,7 @@ class SettingsTab(QWidget):
         units_form.addRow("Mass:", self._mass_u)
         units_form.addRow("Area:", self._area_u)
         units_form.addRow("Power:", self._power_u)
+        units_form.addRow("Force:", self._force_u)
         main.addWidget(units_box)
 
         # ── Solver ────────────────────────────────────────────────────────
@@ -162,6 +166,7 @@ class SettingsTab(QWidget):
         self._mass_u.set_value(cascaded.mass_unit, block_signals=True)
         self._area_u.set_value(cascaded.area_unit, block_signals=True)
         self._power_u.set_value(cascaded.power_unit, block_signals=True)
+        self._force_u.set_value(cascaded.force_unit, block_signals=True)
 
     def _browse_db(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -182,6 +187,7 @@ class SettingsTab(QWidget):
             mass_unit=self._mass_u.current_enum(),
             area_unit=self._area_u.current_enum(),
             power_unit=self._power_u.current_enum(),
+            force_unit=self._force_u.current_enum(),
             max_iterations=self._max_iter.value(),
             auto_recalculate=self._auto_calc.isChecked(),
             database_path=self._db_path.text(),

@@ -76,13 +76,15 @@ class ConstraintsTab(QWidget):
         dp_label.setObjectName("SectionTitle")
         layout.addWidget(dp_label)
 
+        is_power = self._store.state.sizing.brief.propulsion_type.is_power_mode
+
         dp_row = QHBoxLayout()
         self._card_ws   = ResultCard("W/S", unit="N/m²")
-        self._card_load = ResultCard("W/P", unit="N/W")   # updated dynamically
+        self._card_load = ResultCard("W/P" if is_power else "T/W", unit=self._dc().power_loading(0)[1] if is_power else self._dc().force_loading(0)[1])   # updated dynamically
         self._card_wto  = ResultCard("MTOW", unit="kg")
         self._card_s    = ResultCard("Wing Area S", unit="m²")
         self._card_b    = ResultCard("Wingspan b", unit="m")
-        self._card_p    = ResultCard("Power / Thrust", unit="W")
+        self._card_p    = ResultCard("Power" if is_power else "Thrust", unit=self._dc().power(0)[1] if is_power else self._dc().force(0)[1])
         for card in [self._card_ws, self._card_load, self._card_wto,
                      self._card_s, self._card_b, self._card_p]:
             dp_row.addWidget(card)
@@ -119,7 +121,8 @@ class ConstraintsTab(QWidget):
             _, pl_unit = dc.power_loading(0)
             y_label = f"W/P [{pl_unit}]"
         else:
-            y_label = "T/W [-]"
+            _, fl_unit = dc.force_loading(0)
+            y_label = f"T/W [{fl_unit}]"
 
         self._plot.setLabel("bottom", f"Wing Loading W/S [{ws_unit}]")
         self._plot.setLabel("left", y_label)
@@ -176,12 +179,13 @@ class ConstraintsTab(QWidget):
         """Re-render everything with new units."""
         self._on_constraint_result()
         self._on_design_point()
+        self._update_cards_label()
 
     def _on_brief_changed(self) -> None:
-        """Update loading card label when propulsion type changes."""
-        self._update_loading_card_label()
+        """Update loading and power / force cards labels when propulsion type changes."""
+        self._update_cards_label()
 
-    def _update_loading_card_label(self) -> None:
+    def _update_cards_label(self) -> None:
         """Dynamic T/W (thrust) vs W/P (power) label based on propulsion type."""
         from app.core.enums import PowerUnit
         brief = self._store.state.sizing.brief
@@ -190,9 +194,18 @@ class ConstraintsTab(QWidget):
         dc = self._dc()
         if is_power:
             _, ld_unit = dc.power_loading(0)
-            self._card_load._lbl.setText(f"W/P [{ld_unit}]")
+            self._card_load._lbl.setText("W/P")
+            self._card_load.set_unit(ld_unit)
+            _, p_unit = dc.power(0)
+            self._card_p._lbl.setText("Power")
+            self._card_p.set_unit(p_unit)
         else:
-            self._card_load._lbl.setText("T/W [—]")
+            _, ld_unit = dc.force_loading(0)
+            self._card_load._lbl.setText("T/W")
+            self._card_load.set_unit(ld_unit)
+            _, f_unit = dc.force(0)
+            self._card_p._lbl.setText("Thrust")
+            self._card_p.set_unit(f_unit)
 
     # ── Click-to-place ───────────────────────────────────────────────────
 
@@ -297,13 +310,14 @@ class ConstraintsTab(QWidget):
 
     def _update_cards(self, dp: DesignPoint) -> None:
         dc = self._dc()
+        is_power = self._store.state.sizing.brief.propulsion_type.is_power_mode
 
         ws_v, ws_u     = dc.wing_loading(dp.wing_loading_nm2)
-        ld_v, ld_u     = dc.power_loading(dp.power_loading_nw)
+        ld_v, ld_u     = dc.power_loading(dp.power_loading_nw) if is_power else dc.force_loading(dp.power_loading_nw)
         wto_v, wto_u   = dc.mass(dp.w_to_kg)
         s_v, s_u       = dc.area(dp.wing_area_m2)
         b_v, b_u       = dc.length(dp.wingspan_m)
-        p_v, p_u       = dc.power(dp.engine_power_w)
+        p_v, p_u       = dc.power(dp.engine_power_w) if is_power else dc.force(dp.engine_power_w)
 
         self._card_ws.set_value(ws_v, decimals=1);     self._card_ws.set_unit(ws_u)
         self._card_load.set_value(ld_v, decimals=5);    self._card_load.set_unit(ld_u)

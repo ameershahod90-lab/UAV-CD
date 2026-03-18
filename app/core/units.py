@@ -177,6 +177,7 @@ def cascade_unit_system(settings: "UserSettings") -> "UserSettings":
             mass_unit=MassUnit.KG,
             area_unit=AreaUnit.M2,
             power_unit=PowerUnit.WATT,
+            force_unit=ForceUnit.NEWTON,
         )
     else:  # IMPERIAL
         return replace(
@@ -186,4 +187,5 @@ def cascade_unit_system(settings: "UserSettings") -> "UserSettings":
             mass_unit=MassUnit.LB,
             area_unit=AreaUnit.FT2,
             power_unit=PowerUnit.HP,
+            force_unit=ForceUnit.LBF,
         )

@@ -24,6 +24,7 @@ from typing import Any
 from app.core.enums import (
     AltitudeUnit,
     AreaUnit,
+    ForceUnit,
     MassUnit,
     PowerUnit,
     SpeedUnit,
@@ -74,6 +75,7 @@ class UserSettings:
     mass_unit:     MassUnit     = MassUnit.KG
     area_unit:     AreaUnit     = AreaUnit.M2
     power_unit:    PowerUnit    = PowerUnit.WATT
+    force_unit:    ForceUnit    = ForceUnit.NEWTON
 
     # Paths
     database_path:    str = ""
