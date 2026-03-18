@@ -176,8 +176,7 @@ class InputTab(QWidget):
         prop_box.layout().addLayout(prop_layout)
         main.addWidget(prop_box)
 
-        # Apply initial visibility
-        self._update_propulsion_visibility(self._store.state.sizing.brief.propulsion_type)
+        
 
 
         # ── Aero Coefficients ─────────────────────────────────────────────
@@ -232,6 +231,8 @@ class InputTab(QWidget):
             lambda: self._show_status("⏳  Weight converged, computing constraints…", 0)
         )
 
+        # Apply initial visibility
+        self._update_propulsion_visibility(self._store.state.sizing.brief.propulsion_type)
         # Apply current unit settings on startup
         self._apply_unit_converters()
 
@@ -301,6 +302,7 @@ class InputTab(QWidget):
         """Show/hide propulsion-specific parameter groups based on type."""
         self._battery_group.setVisible(pt.is_electric)
         self._fuel_group.setVisible(pt.uses_fuel)
+        self._sliders["prop_efficiency"].setVisible(pt.is_power_mode)
 
 
     def _on_run(self) -> None:
