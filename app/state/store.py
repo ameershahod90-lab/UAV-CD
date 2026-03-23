@@ -166,6 +166,12 @@ class AppStore(QObject):
         self._state.sizing.design_point = point
         self._mark_dirty()
         self.design_point_changed.emit()
+        # Also fire violation signal so banner updates on every design point change
+        if point.violated_constraints:
+            self.constraint_violation.emit(list(point.violated_constraints))
+        else:
+            self.constraint_violation.emit([])
+
 
     def append_sizing_run(self, run: SizingRun) -> None:
         self._state.sizing.run_history.append(run)

@@ -438,6 +438,10 @@ class DesignPoint:
     # ── Sanity checks ─────────────────────────────────────────────────────
     sanity_checks: tuple[SanityCheck, ...]
 
+    # ── Constraint violations at this design point ────────────────────────
+    violated_constraints: tuple[ConstraintViolation, ...] = ()
+
+
 
 # ===========================================================================
 # Sizing Run Snapshot — for multi-run comparison
