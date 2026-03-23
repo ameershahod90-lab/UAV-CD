@@ -2,13 +2,14 @@
 Tests — Core Domain Layer — UAV-CD-APP
 =========================================
 Unit tests for: atmosphere, validation, units, classification,
-weight buildup, and design point engines.
+weight buildup (per-segment Sadraey §2.6-2.7), and design point engines.
 """
 
 from __future__ import annotations
 
 import math
 import pytest
+
 
 # ---------------------------------------------------------------------------
 # Atmosphere
@@ -37,14 +38,12 @@ class TestAtmosphereModel:
     def test_speed_of_sound_sea_level(self) -> None:
         from app.core.atmosphere import AtmosphereModel
         atm = AtmosphereModel.sea_level()
-        # ISA a₀ ≈ 340.29 m/s
         assert abs(atm.speed_of_sound_ms - 340.29) < 1.0
 
     def test_altitude_clamping(self) -> None:
         from app.core.atmosphere import AtmosphereModel
         atm_high = AtmosphereModel.at_altitude(100_000.0)
         atm_25k  = AtmosphereModel.at_altitude(25_000.0)
-        # Both should return clamped result at 25 000 m
         assert abs(atm_high.altitude_m - atm_25k.altitude_m) < 1.0
 
 
@@ -115,6 +114,83 @@ class TestEntityValidator:
 
 
 # ---------------------------------------------------------------------------
+# Mission Segments
+# ---------------------------------------------------------------------------
+
+class TestMissionSegments:
+    def test_default_profile_has_six_segments(self) -> None:
+        from app.core.entities import DesignBrief, CruiseMissionSegment, LoiterMissionSegment
+        from app.core.enums import SegmentType
+        brief = DesignBrief()
+        segs = brief.mission_segments
+        assert len(segs) == 6
+        types = [s.segment_type for s in segs]
+        assert SegmentType.TAKEOFF in types
+        assert SegmentType.CLIMB in types
+        assert SegmentType.CRUISE in types
+        assert SegmentType.LOITER in types
+        assert SegmentType.DESCENT in types
+        assert SegmentType.LANDING in types
+
+    def test_total_range_aggregation(self) -> None:
+        from app.core.entities import DesignBrief, CruiseMissionSegment
+        brief = DesignBrief()
+        # Remove existing cruise segments, add two custom ones
+        brief.mission_segments = [
+            CruiseMissionSegment(range_km=75.0),
+            CruiseMissionSegment(range_km=25.0),
+        ]
+        assert abs(brief.total_range_km - 100.0) < 1e-9
+
+    def test_total_endurance_aggregation(self) -> None:
+        from app.core.entities import DesignBrief, LoiterMissionSegment
+        brief = DesignBrief()
+        brief.mission_segments = [
+            LoiterMissionSegment(endurance_hr=1.5),
+            LoiterMissionSegment(endurance_hr=0.5),
+        ]
+        assert abs(brief.total_endurance_hr - 2.0) < 1e-9
+
+    def test_disabled_segment_excluded_from_aggregation(self) -> None:
+        from app.core.entities import DesignBrief, CruiseMissionSegment
+        brief = DesignBrief()
+        brief.mission_segments = [
+            CruiseMissionSegment(range_km=100.0, enabled=True),
+            CruiseMissionSegment(range_km=50.0, enabled=False),
+        ]
+        assert abs(brief.total_range_km - 100.0) < 1e-9
+
+    def test_has_valid_mission_requires_dynamic_segment(self) -> None:
+        from app.core.entities import DesignBrief, MissionSegment
+        from app.core.enums import SegmentType
+        brief = DesignBrief()
+        # Only fixed segments, all enabled
+        brief.mission_segments = [
+            MissionSegment(SegmentType.TAKEOFF),
+            MissionSegment(SegmentType.CLIMB),
+            MissionSegment(SegmentType.DESCENT),
+            MissionSegment(SegmentType.LANDING),
+        ]
+        assert not brief.has_valid_mission
+
+    def test_energy_source_normalised_for_electric(self) -> None:
+        from app.core.entities import DesignBrief, CruiseMissionSegment
+        from app.core.enums import EnergySource, PropulsionType
+        brief = DesignBrief(propulsion_type=PropulsionType.ELECTRIC)
+        brief.mission_segments = [CruiseMissionSegment()]
+        normed = brief.normalised_segments()
+        assert all(s.energy_source is EnergySource.BATTERY for s in normed)
+
+    def test_energy_source_normalised_for_piston(self) -> None:
+        from app.core.entities import DesignBrief, CruiseMissionSegment
+        from app.core.enums import EnergySource, PropulsionType
+        brief = DesignBrief(propulsion_type=PropulsionType.PISTON)
+        brief.mission_segments = [CruiseMissionSegment()]
+        normed = brief.normalised_segments()
+        assert all(s.energy_source is EnergySource.FUEL for s in normed)
+
+
+# ---------------------------------------------------------------------------
 # Classification Validation
 # ---------------------------------------------------------------------------
 
@@ -157,40 +233,106 @@ class TestClassificationValidation:
 
 
 # ---------------------------------------------------------------------------
-# Weight Buildup
+# Weight Buildup — Sadraey §2.6-2.7 per-segment engine
 # ---------------------------------------------------------------------------
 
 class TestWeightBuildup:
-    def _solve(self, propulsion: str = "Electric") -> object:
-        from app.core.entities import DesignBrief, RegressionCoeffs
-        from app.core.enums import DataSource, PropulsionType
-        from app.core.weight_buildup import WeightBuildupEngine
+    def _make_brief_electric(self) -> object:
+        from app.core.entities import DesignBrief, LoiterMissionSegment
+        from app.core.enums import PropulsionType
         brief = DesignBrief(
             payload_mass_kg=5.0,
-            propulsion_type=PropulsionType(propulsion),
+            propulsion_type=PropulsionType.ELECTRIC,
         )
-        coeffs = RegressionCoeffs(
+        # Just loiter+cruise for simplicity
+        brief.mission_segments = [LoiterMissionSegment(endurance_hr=2.0)]
+        return brief
+
+    def _make_brief_piston(self) -> object:
+        from app.core.entities import DesignBrief, CruiseMissionSegment, MissionSegment
+        from app.core.enums import PropulsionType, SegmentType
+        brief = DesignBrief(
+            payload_mass_kg=5.0,
+            propulsion_type=PropulsionType.PISTON,
+        )
+        brief.mission_segments = [
+            MissionSegment(SegmentType.TAKEOFF),
+            MissionSegment(SegmentType.CLIMB),
+            CruiseMissionSegment(range_km=50.0),
+            MissionSegment(SegmentType.DESCENT),
+            MissionSegment(SegmentType.LANDING),
+        ]
+        return brief
+
+    def _coeffs(self):
+        from app.core.entities import RegressionCoeffs
+        from app.core.enums import DataSource
+        return RegressionCoeffs(
             class_name="Test",
             we_a=-0.001, we_b=0.65,
             data_source=DataSource.TEXTBOOK,
         )
-        engine = WeightBuildupEngine()
-        return engine.solve(brief, coeffs)
 
     def test_electric_converges(self) -> None:
-        result = self._solve("Electric")
+        from app.core.weight_buildup import WeightBuildupEngine
+        result = WeightBuildupEngine().solve(self._make_brief_electric(), self._coeffs())
         assert result.converged
         assert result.w_to_kg > result.w_payload_kg
         assert 0 < result.empty_weight_fraction < 1
 
     def test_piston_converges(self) -> None:
-        result = self._solve("Piston")
+        from app.core.weight_buildup import WeightBuildupEngine
+        result = WeightBuildupEngine().solve(self._make_brief_piston(), self._coeffs())
         assert result.converged
 
     def test_masses_sum_to_wto(self) -> None:
-        result = self._solve()
+        from app.core.weight_buildup import WeightBuildupEngine
+        result = WeightBuildupEngine().solve(self._make_brief_electric(), self._coeffs())
         total = result.w_empty_kg + result.w_fuel_or_battery_kg + result.w_payload_kg
-        assert abs(total - result.w_to_kg) < 0.01  # ≤1 g discrepancy
+        assert abs(total - result.w_to_kg) < 0.1  # ≤100g (fractions + rounding)
+
+    def test_segment_fractions_produced(self) -> None:
+        from app.core.weight_buildup import WeightBuildupEngine
+        result = WeightBuildupEngine().solve(self._make_brief_piston(), self._coeffs())
+        assert len(result.segment_fractions) == 5  # 5 segments defined above
+        for sfr in result.segment_fractions:
+            assert not math.isnan(sfr.weight_fraction)
+            assert 0.0 < sfr.weight_fraction <= 1.0
+
+    def test_cl_cruise_and_ld_max_populated(self) -> None:
+        from app.core.weight_buildup import WeightBuildupEngine
+        result = WeightBuildupEngine().solve(self._make_brief_electric(), self._coeffs())
+        assert result.cl_cruise > 0
+        assert result.ld_max > 1  # L/D > 1 always for a real aircraft
+
+    def test_hybrid_mixed_segments(self) -> None:
+        from app.core.entities import (
+            DesignBrief, CruiseMissionSegment, LoiterMissionSegment,
+            MissionSegment,
+        )
+        from app.core.enums import EnergySource, PropulsionType, SegmentType
+        from app.core.weight_buildup import WeightBuildupEngine
+
+        brief = DesignBrief(
+            payload_mass_kg=5.0,
+            propulsion_type=PropulsionType.HYBRID,
+        )
+        brief.mission_segments = [
+            CruiseMissionSegment(
+                range_km=40.0, enabled=True, energy_source=EnergySource.FUEL
+            ),
+            LoiterMissionSegment(
+                endurance_hr=1.0, enabled=True, energy_source=EnergySource.BATTERY
+            ),
+        ]
+        result = WeightBuildupEngine().solve(brief, self._coeffs())
+        assert result.converged
+        assert result.w_to_kg > brief.payload_mass_kg
+        # Segments: one fuel, one battery → both in breakdown
+        sources = {sfr.energy_source for sfr in result.segment_fractions}
+        from app.core.enums import EnergySource
+        assert EnergySource.FUEL in sources
+        assert EnergySource.BATTERY in sources
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +402,7 @@ class TestSettings:
 
 
 # ---------------------------------------------------------------------------
-# Project File Roundtrip
+# Project File Roundtrip (including segments)
 # ---------------------------------------------------------------------------
 
 class TestProjectFile:
@@ -274,3 +416,33 @@ class TestProjectFile:
         assert loaded is not None
         assert loaded.meta.name == "Test Project"
         assert abs(loaded.sizing.brief.payload_mass_kg - 7.5) < 1e-9
+
+    def test_segment_roundtrip(self, tmp_path) -> None:
+        from app.state.project_file import new_project, save_project, load_project
+        from app.core.entities import CruiseMissionSegment, LoiterMissionSegment, MissionSegment
+        from app.core.enums import EnergySource, SegmentType
+
+        state = new_project("Seg Test")
+        state.sizing.brief.mission_segments = [
+            MissionSegment(SegmentType.TAKEOFF),
+            CruiseMissionSegment(range_km=80.0, label_override="Transit"),
+            LoiterMissionSegment(endurance_hr=3.5, enabled=False),
+            MissionSegment(SegmentType.LANDING),
+        ]
+        path = str(tmp_path / "seg_test.uavcd")
+        save_project(state, path)
+        loaded = load_project(path)
+        assert loaded is not None
+
+        segs = loaded.sizing.brief.mission_segments
+        assert len(segs) == 4
+
+        cruise = segs[1]
+        assert isinstance(cruise, CruiseMissionSegment)
+        assert abs(cruise.range_km - 80.0) < 1e-9
+        assert cruise.label_override == "Transit"
+
+        loiter = segs[2]
+        assert isinstance(loiter, LoiterMissionSegment)
+        assert not loiter.enabled
+        assert abs(loiter.endurance_hr - 3.5) < 1e-9

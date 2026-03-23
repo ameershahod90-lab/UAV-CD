@@ -26,7 +26,8 @@ from app.services.database_service import DatabaseService
 from app.services.sizing_service import SizingService
 from app.state.store import AppStore
 from app.ui.tabs.sizing.constraints_tab import ConstraintsTab
-from app.ui.tabs.sizing.input_tab import InputTab
+from app.ui.tabs.sizing.general_tab import GeneralTab
+from app.ui.tabs.sizing.mission_tab import MissionTab
 from app.ui.tabs.sizing.output_tab import OutputTab
 from app.ui.tabs.sizing.weight_tab import WeightTab
 from app.ui.themes import QSS_DARK, QSS_LIGHT
@@ -66,10 +67,11 @@ class MainWindow(QMainWindow):
 
         # Sizing tab (sub-tabbed)
         sizing_tabs = QTabWidget()
-        sizing_tabs.addTab(InputTab(store),      "⚙  Input")
-        sizing_tabs.addTab(WeightTab(store),     "⚖  Weight")
+        sizing_tabs.addTab(GeneralTab(store),     "⚙  General")
+        sizing_tabs.addTab(MissionTab(store),     "📋  Mission")
+        sizing_tabs.addTab(WeightTab(store),      "⚖  Weight")
         sizing_tabs.addTab(ConstraintsTab(store), "📊  Constraints")
-        sizing_tabs.addTab(OutputTab(store),     "🎯  Output")
+        sizing_tabs.addTab(OutputTab(store),      "🎯  Output")
         root.addTab(sizing_tabs, "Phase 1 — Initial Sizing")
 
         # Historical data tab (placeholder for now — full implementation next)

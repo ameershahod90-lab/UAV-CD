@@ -2,7 +2,7 @@
 Weight Tab — UAV-CD-APP
 =========================
 Displays weight buildup results: summary cards, convergence history plot,
-and a weight breakdown pie chart.
+per-segment weight fraction breakdown table, and aerodynamic readouts.
 
 All mass/force values are displayed in the current display unit from
 settings (kg/lb). Reacts to settings_changed for live unit refresh.
@@ -19,11 +19,16 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from app.core.display_converter import DisplayConverter
+from app.core.enums import EnergySource
 from app.state.store import AppStore
 from app.ui.widgets.result_card import ResultCard
 
@@ -35,7 +40,17 @@ class WeightTab(QWidget):
         super().__init__(parent)
         self._store: AppStore = store
 
-        layout = QVBoxLayout(self)
+        # Scroll wrapper
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(scroll.Shape.NoFrame)
+        content = QWidget()
+        scroll.setWidget(content)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
 
@@ -62,7 +77,18 @@ class WeightTab(QWidget):
 
         layout.addLayout(cards_row)
 
-        # ── Convergence plot ──────────────────────────────────────────────
+        # ── Aero readouts (from weight result) ────────────────────────────────
+        aero_row = QHBoxLayout()
+        self._cl_card = ResultCard("CL✓ (best L/D)", unit="—")
+        self._cl_card.setToolTip("CL* = √(CD0/k) — lift coefficient at maximum L/D")
+        self._ld_card = ResultCard("(L/D)_max", unit="—")
+        self._ld_card.setToolTip("Maximum Lift-to-Drag ratio used in Breguet equations")
+        aero_row.addWidget(self._cl_card)
+        aero_row.addWidget(self._ld_card)
+        aero_row.addStretch()
+        layout.addLayout(aero_row)
+
+        # ── Convergence plot ───────────────────────────────────────────────
         conv_title = QLabel("Convergence History")
         conv_title.setObjectName("SectionTitle")
         layout.addWidget(conv_title)
@@ -70,12 +96,30 @@ class WeightTab(QWidget):
         self._conv_plot = pg.PlotWidget()
         self._conv_plot.setLabel("left", "W_TO", units="kg")
         self._conv_plot.setLabel("bottom", "Iteration")
-        self._conv_plot.setMinimumHeight(200)
+        self._conv_plot.setMinimumHeight(180)
         self._conv_plot.setBackground("transparent")
         self._conv_plot.showGrid(x=True, y=True, alpha=0.3)
         layout.addWidget(self._conv_plot)
 
-        # Connect to store
+        # ── Per-segment breakdown table ────────────────────────────────────
+        seg_title = QLabel("Mission Segment Weight Fractions  (Sadraey §2.6-2.7)")
+        seg_title.setObjectName("SectionTitle")
+        layout.addWidget(seg_title)
+
+        self._seg_table = QTableWidget(0, 4)
+        self._seg_table.setHorizontalHeaderLabels([
+            "Segment", "Energy", "W_i / W_{i−1}", "Cumulative W"
+        ])
+        self._seg_table.horizontalHeader().setStretchLastSection(True)
+        self._seg_table.setAlternatingRowColors(True)
+        self._seg_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._seg_table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+        self._seg_table.setMinimumHeight(140)
+        layout.addWidget(self._seg_table)
+
+        # ── Signals ────────────────────────────────────────────────────
         self._store.weight_result_changed.connect(self._refresh)
         self._store.settings_changed.connect(self._refresh)
 
@@ -100,19 +144,23 @@ class WeightTab(QWidget):
         self._card_wto.set_unit(wto_u)
         self._card_empty.set_value(emp_v, decimals=3)
         self._card_empty.set_unit(emp_u)
-        self._card_fb._lbl.setText(self._store.state.sizing.brief.propulsion_type.power_source)
+        ps = self._store.state.sizing.brief.propulsion_type.power_source
+        self._card_fb._lbl.setText(ps)
         self._card_fb.set_value(fb_v, decimals=3)
         self._card_fb.set_unit(fb_u)
 
-        # Fractions — dimensionless
         self._card_ewf.set_value(result.empty_weight_fraction, decimals=4)
-        self._card_fbf._lbl.setText(f"{self._store.state.sizing.brief.propulsion_type.power_source} Fraction")
+        self._card_fbf._lbl.setText(f"{ps} Fraction")
         self._card_fbf.set_value(result.fuel_battery_fraction, decimals=4)
         self._card_iter.set_text(
             f"{result.iterations} {'✓' if result.converged else '⚠'}"
         )
 
-        # Convergence plot (always in display mass unit)
+        # Aero readouts
+        self._cl_card.set_value(result.cl_cruise, decimals=4)
+        self._ld_card.set_value(result.ld_max, decimals=2)
+
+        # Convergence plot (display mass unit)
         self._conv_plot.clear()
         history = list(result.convergence_history)
         if len(history) >= 2:
@@ -121,7 +169,32 @@ class WeightTab(QWidget):
             pen = pg.mkPen(color="#7c6af7", width=2)
             self._conv_plot.plot(xs, disp_history, pen=pen, symbol="o",
                                  symbolSize=5, symbolBrush="#7c6af7")
-
-        # Update plot axis label with current unit
         _, mass_label = dc.mass(0)
         self._conv_plot.setLabel("left", "W_TO", units=mass_label)
+
+        # Per-segment breakdown table
+        import math
+        self._seg_table.setRowCount(0)
+        for sfr in result.segment_fractions:
+            row = self._seg_table.rowCount()
+            self._seg_table.insertRow(row)
+
+            self._seg_table.setItem(row, 0, QTableWidgetItem(sfr.segment_label))
+
+            src_item = QTableWidgetItem(
+                "⚡ Battery" if sfr.energy_source is EnergySource.BATTERY else "⛽ Fuel"
+            )
+            self._seg_table.setItem(row, 1, src_item)
+
+            frac_val = sfr.weight_fraction
+            frac_text = f"{frac_val:.5f}" if not math.isnan(frac_val) else "—"
+            frac_item = QTableWidgetItem(frac_text)
+            frac_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._seg_table.setItem(row, 2, frac_item)
+
+            cum_v, cum_u = dc.mass(sfr.cumulative_weight_kg)
+            cum_item = QTableWidgetItem(f"{cum_v:.3f} {cum_u}")
+            cum_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._seg_table.setItem(row, 3, cum_item)
+
+        self._seg_table.resizeColumnsToContents()

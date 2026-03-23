@@ -127,3 +127,64 @@ class DataSource(Enum):
     """Origin of regression coefficients."""
     DATABASE = "From historical database"
     TEXTBOOK = "Textbook fallback (insufficient data)"
+
+
+# ---------------------------------------------------------------------------
+# Mission Segments
+# ---------------------------------------------------------------------------
+
+class SegmentType(Enum):
+    """
+    Ordered mission phase types.
+
+    Fixed segments appear in a fixed position in the panel and can only be
+    enabled/disabled. Dynamic segments (CRUISE, LOITER) can be added, removed,
+    and reordered freely.
+    """
+    TAKEOFF  = "Takeoff"
+    CLIMB    = "Climb"
+    CRUISE   = "Cruise"            # Range segment (dynamic)
+    LOITER   = "Loiter/Endurance"  # Endurance segment (dynamic)
+    DESCENT  = "Descent"
+    LANDING  = "Landing"
+
+    @property
+    def label(self) -> str:
+        return self.value
+
+    @property
+    def icon(self) -> str:
+        _icons = {
+            "Takeoff":           "🛫",
+            "Climb":             "📈",
+            "Cruise":            "✈",
+            "Loiter/Endurance":  "🔄",
+            "Descent":           "📉",
+            "Landing":           "🛬",
+        }
+        return _icons.get(self.value, "▶")
+
+    @property
+    def is_fixed(self) -> bool:
+        """Fixed segments cannot be added/removed/reordered, only toggled."""
+        return self in (
+            SegmentType.TAKEOFF,
+            SegmentType.CLIMB,
+            SegmentType.DESCENT,
+            SegmentType.LANDING,
+        )
+
+    @property
+    def is_dynamic(self) -> bool:
+        return not self.is_fixed
+
+
+class EnergySource(Enum):
+    """
+    Energy source used within a mission segment.
+    Only meaningful when PropulsionType.HYBRID is selected;
+    for all other types it is fixed to the propulsion's natural source.
+    """
+    FUEL    = "Fuel"
+    BATTERY = "Battery"
+

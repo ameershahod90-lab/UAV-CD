@@ -138,8 +138,18 @@ QComboBox {
     color: #e0e0f0;
 }
 QComboBox:focus { border-color: #7c6af7; }
-QComboBox::drop-down { border: none; width: 24px; }
-QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #888aaa; }
+QComboBox::drop-down {
+    border: none;
+    width: 26px;
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    padding-right: 4px;
+}
+QComboBox::down-arrow {
+    image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23888aaa' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    width: 12px;
+    height: 8px;
+}
 QComboBox QAbstractItemView {
     background-color: #2a2a3e;
     border: 1px solid #5a5a8a;
@@ -256,15 +266,27 @@ QGroupBox::title {
 
 /* ── CheckBox / RadioButton ─────────────────────────────────────────── */
 QCheckBox, QRadioButton { color: #e0e0f0; spacing: 6px; }
-QCheckBox::indicator, QRadioButton::indicator {
+QCheckBox::indicator {
     width: 14px; height: 14px;
     border: 1px solid #5a5a8a;
     border-radius: 3px;
     background: #2a2a3e;
 }
-QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #7c6af7;
+QCheckBox::indicator:checked {
+    background-color: #7c6af7;
     border-color: #7c6af7;
+    image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 6l3 3 5-5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+QRadioButton::indicator {
+    width: 14px; height: 14px;
+    border: 1px solid #5a5a8a;
+    border-radius: 7px;
+    background: #2a2a3e;
+}
+QRadioButton::indicator:checked {
+    background-color: #7c6af7;
+    border-color: #7c6af7;
+    image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'><circle cx='4' cy='4' r='3' fill='white'/></svg>");
 }
 """
 
@@ -352,9 +374,17 @@ QComboBox {
     border-radius: 5px; padding: 4px 8px; color: #1a1a2e;
 }
 QComboBox:focus { border-color: #6c5ce7; }
-QComboBox QAbstractItemView {
-    background-color: #ffffff; border: 1px solid #c0c0d8;
-    selection-background-color: #6c5ce7; color: #1a1a2e;
+QComboBox::drop-down {
+    border: none;
+    width: 26px;
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    padding-right: 4px;
+}
+QComboBox::down-arrow {
+    image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23444466' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    width: 12px;
+    height: 8px;
 }
 
 QPushButton {
@@ -388,9 +418,31 @@ QMenu::item:selected { background-color: #6c5ce7; color: #ffffff; }
 QStatusBar { background-color: #eeeef8; color: #888aaa; border-top: 1px solid #d0d0e0; font-size: 12px; }
 QGroupBox { border: 1px solid #d0d0e0; border-radius: 6px; margin-top: 10px; padding-top: 8px; }
 QGroupBox::title { color: #666688; left: 10px; }
-QCheckBox, QRadioButton { color: #1a1a2e; }
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 14px; height: 14px; border: 1px solid #aaaacc; border-radius: 3px; background: #ffffff;
+QComboBox QAbstractItemView {
+    background-color: #ffffff; border: 1px solid #c0c0d8;
+    selection-background-color: #6c5ce7; color: #1a1a2e;
 }
-QCheckBox::indicator:checked { background: #6c5ce7; border-color: #6c5ce7; }
+QCheckBox, QRadioButton { color: #1a1a2e; spacing: 6px; }
+QCheckBox::indicator {
+    width: 14px; height: 14px;
+    border: 1px solid #aaaacc;
+    border-radius: 3px;
+    background: #ffffff;
+}
+QCheckBox::indicator:checked {
+    background-color: #6c5ce7;
+    border-color: #6c5ce7;
+    image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 6l3 3 5-5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+QRadioButton::indicator {
+    width: 14px; height: 14px;
+    border: 1px solid #aaaacc;
+    border-radius: 7px;
+    background: #ffffff;
+}
+QRadioButton::indicator:checked {
+    background-color: #6c5ce7;
+    border-color: #6c5ce7;
+    image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'><circle cx='4' cy='4' r='3' fill='white'/></svg>");
+}
 """

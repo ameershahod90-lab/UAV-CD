@@ -28,8 +28,11 @@ from app.core.entities import (
     ConstraintCurve,
     ConstraintResult,
     ConstraintViolation,
+    CruiseMissionSegment,
     DesignBrief,
     DesignPoint,
+    LoiterMissionSegment,
+    MissionSegment,
     RegressionCoeffs,
     SanityCheck,
     SizingRun,
@@ -38,8 +41,10 @@ from app.core.entities import (
 from app.core.enums import (
     ConstraintSeverity,
     DataSource,
+    EnergySource,
     PropulsionType,
     SanityCheckStatus,
+    SegmentType,
 )
 from app.state.app_state import AppState, HistoricalDataState, ProjectMeta, SizingState
 
@@ -59,16 +64,62 @@ def _enum_val(v: Any) -> Any:
     return v.value if hasattr(v, "value") else v
 
 
+def _ser_mission_segment(s: MissionSegment) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "segment_class": type(s).__name__,
+        "segment_type": _enum_val(s.segment_type),
+        "enabled": s.enabled,
+        "energy_source": _enum_val(s.energy_source),
+    }
+    if isinstance(s, CruiseMissionSegment):
+        base["range_km"] = s.range_km
+        base["label_override"] = s.label_override
+    elif isinstance(s, LoiterMissionSegment):
+        base["endurance_hr"] = s.endurance_hr
+        base["label_override"] = s.label_override
+    return base
+
+
 def _ser_design_brief(b: DesignBrief) -> dict[str, Any]:
-    d = dataclasses.asdict(b)
-    d["propulsion_type"] = _enum_val(b.propulsion_type)
+    d: dict[str, Any] = {
+        "payload_mass_kg": b.payload_mass_kg,
+        "cruise_speed_ms": b.cruise_speed_ms,
+        "stall_speed_ms": b.stall_speed_ms,
+        "max_speed_ms": b.max_speed_ms,
+        "takeoff_run_m": b.takeoff_run_m,
+        "rate_of_climb_ms": b.rate_of_climb_ms,
+        "service_ceiling_m": b.service_ceiling_m,
+        "cruise_altitude_m": b.cruise_altitude_m,
+        "propulsion_type": _enum_val(b.propulsion_type),
+        "c_l_max": b.c_l_max,
+        "c_d0": b.c_d0,
+        "oswald_efficiency": b.oswald_efficiency,
+        "aspect_ratio": b.aspect_ratio,
+        "prop_efficiency": b.prop_efficiency,
+        "battery_energy_density_wh_kg": b.battery_energy_density_wh_kg,
+        "battery_efficiency": b.battery_efficiency,
+        "specific_fuel_consumption_g_wh": b.specific_fuel_consumption_g_wh,
+        "classification_name": b.classification_name,
+        "mission_segments": [_ser_mission_segment(s) for s in b.mission_segments],
+    }
     return d
 
 
 def _ser_weight_result(w: WeightResult) -> dict[str, Any]:
-    d = dataclasses.asdict(w)
-    d["convergence_history"] = list(w.convergence_history)
-    return d
+    return {
+        "w_to_kg": w.w_to_kg,
+        "w_empty_kg": w.w_empty_kg,
+        "w_fuel_or_battery_kg": w.w_fuel_or_battery_kg,
+        "w_payload_kg": w.w_payload_kg,
+        "empty_weight_fraction": w.empty_weight_fraction,
+        "fuel_battery_fraction": w.fuel_battery_fraction,
+        "iterations": w.iterations,
+        "converged": w.converged,
+        "convergence_history": list(w.convergence_history),
+        "cl_cruise": w.cl_cruise,
+        "ld_max": w.ld_max,
+        # segment_fractions omitted from file (re-computed on load)
+    }
 
 
 def _ser_constraint_curve(c: ConstraintCurve) -> dict[str, Any]:
@@ -199,12 +250,55 @@ def _ser_app_state(state: AppState) -> dict[str, Any]:
 # Deserialisation: JSON dict → Python
 # ---------------------------------------------------------------------------
 
+def _deser_mission_segment(d: dict[str, Any]) -> MissionSegment:
+    """Reconstruct the correct MissionSegment child class from a saved dict."""
+    seg_type = SegmentType(d.get("segment_type", SegmentType.CRUISE.value))
+    enabled = bool(d.get("enabled", True))
+    energy_source = EnergySource(d.get("energy_source", EnergySource.FUEL.value))
+    cls_name = d.get("segment_class", "MissionSegment")
+
+    if cls_name == "CruiseMissionSegment" or seg_type is SegmentType.CRUISE:
+        return CruiseMissionSegment(
+            segment_type=SegmentType.CRUISE,
+            enabled=enabled,
+            energy_source=energy_source,
+            range_km=float(d.get("range_km", 50.0)),
+            label_override=d.get("label_override", ""),
+        )
+    if cls_name == "LoiterMissionSegment" or seg_type is SegmentType.LOITER:
+        return LoiterMissionSegment(
+            segment_type=SegmentType.LOITER,
+            enabled=enabled,
+            energy_source=energy_source,
+            endurance_hr=float(d.get("endurance_hr", 1.0)),
+            label_override=d.get("label_override", ""),
+        )
+    return MissionSegment(
+        segment_type=seg_type,
+        enabled=enabled,
+        energy_source=energy_source,
+    )
+
+
 def _deser_design_brief(d: dict[str, Any]) -> DesignBrief:
     d = dict(d)
-    d["propulsion_type"] = PropulsionType(d.get("propulsion_type", "Electric"))
-    return DesignBrief(**{
-        k: v for k, v in d.items() if k in DesignBrief.__dataclass_fields__
-    })
+    pt = PropulsionType(d.pop("propulsion_type", "Electric"))
+    # Reconstruct mission segments if present
+    raw_segs = d.pop("mission_segments", None)
+    if raw_segs is not None:
+        segments = [_deser_mission_segment(s) for s in raw_segs]
+    else:
+        from app.core.entities import _default_mission_segments
+        segments = _default_mission_segments()
+    # Remove any stale legacy fields that are no longer in DesignBrief
+    for legacy in ("range_km", "endurance_hr"):
+        d.pop(legacy, None)
+    valid_fields = DesignBrief.__dataclass_fields__.keys()
+    return DesignBrief(
+        **{k: v for k, v in d.items() if k in valid_fields},
+        propulsion_type=pt,
+        mission_segments=segments,
+    )
 
 
 def _deser_weight_result(d: dict[str, Any]) -> WeightResult:
@@ -219,6 +313,9 @@ def _deser_weight_result(d: dict[str, Any]) -> WeightResult:
         iterations=int(d["iterations"]),
         converged=bool(d["converged"]),
         convergence_history=tuple(float(v) for v in history_list),
+        cl_cruise=float(d.get("cl_cruise", 0.0)),
+        ld_max=float(d.get("ld_max", 0.0)),
+        # segment_fractions not persisted — re-computed on next run
     )
 
 

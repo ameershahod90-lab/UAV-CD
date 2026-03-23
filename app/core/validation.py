@@ -75,7 +75,12 @@ class ValidationError:
 # Registry: (EntityType, field_name) → FieldSpec
 # ===========================================================================
 
-from app.core.entities import DesignBrief, ClassificationRange  # noqa: E402
+from app.core.entities import (
+    ClassificationRange,
+    CruiseMissionSegment,
+    DesignBrief,
+    LoiterMissionSegment,
+)  # noqa: E402
 
 FIELD_SPECS: dict[tuple[type, str], FieldSpec] = {
 
@@ -101,16 +106,6 @@ FIELD_SPECS: dict[tuple[type, str], FieldSpec] = {
         label="Max Speed", unit="m/s",
         hint="Never-exceed speed (VNE). Must be > cruise speed.",
         gt_zero=True, max_val=900.0,
-    ),
-    (DesignBrief, "range_km"): FieldSpec(
-        label="Range", unit="km",
-        hint="Required mission range (wheel-to-wheel).",
-        gte_zero=True, max_val=50_000.0,
-    ),
-    (DesignBrief, "endurance_hr"): FieldSpec(
-        label="Endurance", unit="h",
-        hint="Required loiter / on-station time.",
-        gte_zero=True, max_val=500.0,
     ),
     (DesignBrief, "takeoff_run_m"): FieldSpec(
         label="Takeoff Run", unit="m",
@@ -175,6 +170,22 @@ FIELD_SPECS: dict[tuple[type, str], FieldSpec] = {
         label="SFC", unit="g/(W·h)",
         hint="Brake specific fuel consumption. Typical piston: 0.30–0.45 g/(W·h).",
         gt_zero=True, max_val=5.0,
+    ),
+
+    # ── CruiseMissionSegment ────────────────────────────────────────────────
+
+    (CruiseMissionSegment, "range_km"): FieldSpec(
+        label="Range", unit="km",
+        hint="Distance to fly in this cruise segment.",
+        gt_zero=True, max_val=50_000.0,
+    ),
+
+    # ── LoiterMissionSegment ────────────────────────────────────────────────
+
+    (LoiterMissionSegment, "endurance_hr"): FieldSpec(
+        label="Endurance", unit="h",
+        hint="On-station loiter time for this segment.",
+        gt_zero=True, max_val=500.0,
     ),
 
     # ── ClassificationRange ──────────────────────────────────────────────────
