@@ -87,9 +87,9 @@ class GeneralTab(QWidget):
         main.setContentsMargins(16, 16, 16, 16)
         main.setSpacing(16)
 
+        self._build_classification(main)
         self._build_propulsion(main)
         self._build_aero(main)
-        self._build_classification(main)
         self._build_run_button(main)
         main.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
