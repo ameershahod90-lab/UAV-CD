@@ -35,3 +35,6 @@ settings.json
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Project bible (local only — do not publish)
+.agents/
