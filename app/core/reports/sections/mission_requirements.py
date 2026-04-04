@@ -2,6 +2,7 @@
 from __future__ import annotations
 from app.core.reports.base import ReportSection, ReportContext, SectionCategory
 from app.core.reports.renderer import ReportBuilder
+from app.core.entities import CruiseMissionSegment, LoiterMissionSegment
 
 
 class MissionRequirementsSection(ReportSection):
@@ -15,38 +16,38 @@ class MissionRequirementsSection(ReportSection):
         rb.add_heading(self.title, level=1)
         rb.add_paragraph(
             "The following mission requirements form the basis of the sizing study. "
-            "All calculations are performed in SI units; display units shown below "
-            "reflect the user's selected preferences."
+            "All calculations are performed in SI units."
         )
 
-        b   = ctx.brief
-        dc  = ctx.display_converter
-
-        spd_v, spd_u = dc.speed(b.cruise_speed_ms)
-        vs_v,  vs_u  = dc.speed(b.stall_speed_ms)
-        vm_v,  vm_u  = dc.speed(b.max_speed_ms)
-        roc_v, roc_u = dc.speed(b.rate_of_climb_ms)
-        alt_v, alt_u = dc.length(b.cruise_altitude_m)
-        sc_v,  sc_u  = dc.length(b.service_ceiling_m)
-        to_v,  to_u  = dc.length(b.takeoff_run_m)
-        pm_v,  pm_u  = dc.mass(b.payload_mass_kg)
+        b = ctx.brief
 
         rows = [
-            ["Payload Mass",        f"{pm_v:.2f} {pm_u}",        "Design payload carried by the UAV"],
-            ["Cruise Speed",        f"{spd_v:.1f} {spd_u}",      "Nominal cruise airspeed"],
-            ["Stall Speed",         f"{vs_v:.1f} {vs_u}",        "Minimum safe flight speed"],
-            ["Max Speed",           f"{vm_v:.1f} {vm_u}",        "Maximum level flight speed"],
-            ["Rate of Climb",       f"{roc_v:.2f} {roc_u}",      "Climb rate at sea level"],
-            ["Cruise Altitude",     f"{alt_v:.0f} {alt_u}",      "Nominal operating altitude"],
-            ["Service Ceiling",     f"{sc_v:.0f} {sc_u}",        "Maximum altitude (ROC = 0.508 m/s)"],
-            ["Takeoff Run",         f"{to_v:.0f} {to_u}",        "Ground roll distance required"],
-            ["Propulsion Type",     b.propulsion_type.label,     "Propulsion system category"],
-            ["Aspect Ratio",        f"{b.aspect_ratio:.2f}",     "Wing aspect ratio"],
-            ["CD₀",                 f"{b.c_d0:.4f}",             "Zero-lift drag coefficient"],
-            ["CLmax",               f"{b.c_l_max:.2f}",          "Maximum lift coefficient"],
-            ["Oswald Efficiency",   f"{b.oswald_efficiency:.3f}","Oswald span efficiency factor e"],
-            ["Propeller Efficiency",f"{b.prop_efficiency:.2f}", "Propulsive efficiency ηp (prop/turboprop)"],
+            ["Payload Mass",          f"{b.payload_mass_kg:.3f} kg",   "Design payload"],
+            ["Cruise Speed",          f"{b.cruise_speed_ms:.1f} m/s",  "Nominal cruise airspeed"],
+            ["Stall Speed",           f"{b.stall_speed_ms:.1f} m/s",   "Minimum safe speed"],
+            ["Max Speed",             f"{b.max_speed_ms:.1f} m/s",     "Maximum level speed"],
+            ["Rate of Climb",         f"{b.rate_of_climb_ms:.2f} m/s", "Climb rate at SL"],
+            ["Cruise Altitude",       f"{b.cruise_altitude_m:.0f} m",  "Nominal altitude"],
+            ["Service Ceiling",       f"{b.service_ceiling_m:.0f} m",  "Max altitude (ROC = 0.508 m/s)"],
+            ["Takeoff Run",           f"{b.takeoff_run_m:.0f} m",      "Ground roll distance"],
+            ["Propulsion Type",       b.propulsion_type.label,          "Propulsion category"],
+            ["Aspect Ratio (AR)",     f"{b.aspect_ratio:.2f}",          "Wing aspect ratio"],
+            ["CD0",                   f"{b.c_d0:.4f}",                  "Zero-lift drag coefficient"],
+            ["CLmax",                 f"{b.c_l_max:.2f}",               "Maximum lift coefficient"],
+            ["Oswald Efficiency (e)", f"{b.oswald_efficiency:.3f}",     "Span efficiency"],
+            ["Prop. Efficiency (eta_p)", f"{b.prop_efficiency:.2f}",   "Propulsive efficiency"],
         ]
+
+        # Propulsion-specific fields
+        if b.propulsion_type.is_fuel_mode or b.propulsion_type.is_hybrid:
+            rows.append(["SFC", f"{b.specific_fuel_consumption_g_wh:.4f} g/(W·h)", "Specific fuel consumption"])
+        if not b.propulsion_type.is_fuel_mode or b.propulsion_type.is_hybrid:
+            rows.append(["Battery Energy Density",
+                         f"{b.battery_energy_density_wh_kg:.1f} Wh/kg",
+                         "Li-Po cell specific energy"])
+            rows.append(["Battery Efficiency",
+                         f"{b.battery_efficiency:.3f}",
+                         "Charge/discharge efficiency"])
 
         rb.add_table(
             headers=["Parameter", "Value", "Description"],
@@ -54,33 +55,34 @@ class MissionRequirementsSection(ReportSection):
             caption="Mission design requirements and aerodynamic parameters",
         )
 
-        # Mission segments summary
+        # Mission segments
         rb.add_heading("Mission Segments", level=2)
         seg_rows = []
-        for seg in b.mission_segments:
-            params = "—"
-            if hasattr(seg, "range_km"):
-                r_v, r_u = dc.length(seg.range_km * 1000)
-                params = f"Range: {r_v:.1f} {r_u}"
-            elif hasattr(seg, "endurance_hr"):
+        for i, seg in enumerate(b.mission_segments, 1):
+            kind   = seg.segment_type.name
+            enabled = "Yes" if seg.enabled else "No"
+            energy = seg.energy_source.value if hasattr(seg, "energy_source") else "—"
+            if isinstance(seg, CruiseMissionSegment):
+                params = f"Range: {seg.range_km:.1f} km"
+            elif isinstance(seg, LoiterMissionSegment):
                 params = f"Endurance: {seg.endurance_hr:.2f} hr"
-            seg_rows.append([
-                seg.label,
-                "Enabled" if seg.enabled else "Disabled",
-                getattr(seg, "energy_source", "—").value if hasattr(seg, "energy_source") else "—",
-                params,
-            ])
+            else:
+                params = "Fixed fraction"
+            seg_rows.append([str(i), kind, enabled, energy, params])
+
         rb.add_table(
-            headers=["Segment", "Status", "Energy Source", "Parameters"],
+            headers=["#", "Segment Type", "Enabled", "Energy Source", "Parameters"],
             rows=seg_rows,
             caption="Mission segment profile",
         )
 
         # Totals
-        total_range = b.total_range_km
+        total_range     = b.total_range_km
         total_endurance = b.total_endurance_hr
         if total_range > 0 or total_endurance > 0:
             rb.add_key_value_list([
-                ("Total Range",     f"{total_range:.1f} km"),
-                ("Total Endurance", f"{total_endurance:.2f} hr"),
+                ("Total Range from enabled cruise segments",
+                 f"{total_range:.1f} km"),
+                ("Total Endurance from enabled loiter segments",
+                 f"{total_endurance:.2f} hr"),
             ])

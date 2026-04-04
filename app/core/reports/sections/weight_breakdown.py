@@ -1,5 +1,6 @@
 """Weight Breakdown — order 50."""
 from __future__ import annotations
+import math
 from app.core.reports.base import ReportSection, ReportContext, SectionCategory
 from app.core.reports.renderer import ReportBuilder
 
@@ -11,7 +12,7 @@ class WeightBreakdownSection(ReportSection):
     category      = SectionCategory.ANALYSIS
     description   = (
         "MTOW convergence, mass components, per-segment weight fractions, "
-        "and optional weight pie chart"
+        "and weight pie chart"
     )
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
@@ -24,7 +25,10 @@ class WeightBreakdownSection(ReportSection):
             )
             return
 
-        dc = ctx.display_converter
+        dc  = ctx.display_converter
+        b   = ctx.brief
+        is_fuel = b.propulsion_type.is_fuel_mode
+        is_elec = not b.propulsion_type.is_fuel_mode and not b.propulsion_type.is_hybrid
 
         rb.add_paragraph(
             "Takeoff weight is estimated using the iterative Breguet mission "
@@ -34,25 +38,28 @@ class WeightBreakdownSection(ReportSection):
 
         # ── Top-level weight summary ──────────────────────────────────────
         rb.add_heading("Mass Summary", level=2)
+
         wto_v, wto_u = dc.mass(wr.w_to_kg)
         we_v,  we_u  = dc.mass(wr.w_empty_kg)
         wp_v,  wp_u  = dc.mass(wr.w_payload_kg)
-        wf_v,  wf_u  = dc.mass(wr.w_fuel_kg)   if wr.w_fuel_kg    > 0 else (0, "kg")
-        wb_v,  wb_u  = dc.mass(wr.w_battery_kg) if wr.w_battery_kg > 0 else (0, "kg")
+        wfb_v, wfb_u = dc.mass(wr.w_fuel_or_battery_kg)
+
+        pct_empty   = wr.w_empty_kg          / wr.w_to_kg * 100 if wr.w_to_kg else 0
+        pct_payload = wr.w_payload_kg        / wr.w_to_kg * 100 if wr.w_to_kg else 0
+        pct_fb      = wr.w_fuel_or_battery_kg/ wr.w_to_kg * 100 if wr.w_to_kg else 0
+
+        energy_label = (
+            "Fuel" if is_fuel
+            else "Battery" if is_elec
+            else "Fuel/Battery (Hybrid)"
+        )
 
         summary_rows = [
-            ["Maximum Takeoff Weight", f"{wto_v:.3f} {wto_u}", f"{100:.1f} %"],
-            ["Empty Weight",           f"{we_v:.3f}  {we_u}",  f"{wr.w_empty_kg/wr.w_to_kg*100:.1f} %"],
-            ["Payload",                f"{wp_v:.3f}  {wp_u}",  f"{wr.w_payload_kg/wr.w_to_kg*100:.1f} %"],
+            ["Maximum Takeoff Weight (MTOW)", f"{wto_v:.3f} {wto_u}", f"{100:.1f} %"],
+            ["Empty Weight",                  f"{we_v:.3f} {we_u}",  f"{pct_empty:.1f} %"],
+            ["Payload",                       f"{wp_v:.3f} {wp_u}",  f"{pct_payload:.1f} %"],
+            [energy_label,                    f"{wfb_v:.3f} {wfb_u}", f"{pct_fb:.1f} %"],
         ]
-        if wr.w_fuel_kg > 0:
-            summary_rows.append(
-                ["Fuel",  f"{wf_v:.3f} {wf_u}", f"{wr.w_fuel_kg/wr.w_to_kg*100:.1f} %"]
-            )
-        if wr.w_battery_kg > 0:
-            summary_rows.append(
-                ["Battery", f"{wb_v:.3f} {wb_u}", f"{wr.w_battery_kg/wr.w_to_kg*100:.1f} %"]
-            )
 
         rb.add_table(
             headers=["Component", "Mass", "% MTOW"],
@@ -60,34 +67,42 @@ class WeightBreakdownSection(ReportSection):
             caption="UAV mass breakdown",
         )
 
-        # ── Aerodynamic readouts ──────────────────────────────────────────
+        # ── Key aerodynamic readouts ──────────────────────────────────────
+        k = 1.0 / (math.pi * b.oswald_efficiency * b.aspect_ratio)
         rb.add_key_value_list([
-            ("CL* (best L/D speed)", f"{wr.cl_cruise:.4f}"),
+            ("CL* (best L/D CL)",    f"{wr.cl_cruise:.4f}"),
             ("(L/D)max",             f"{wr.ld_max:.2f}"),
+            ("k (induced drag factor)", f"{k:.5f}"),
+            ("Converged",            "Yes" if wr.converged else "No"),
+            ("Iterations",           str(wr.iterations)),
         ])
 
         # ── Per-segment weight fractions ──────────────────────────────────
         rb.add_heading("Segment Weight Fractions", level=2)
         rb.add_paragraph(
             "Each segment reduces the aircraft weight by its fraction Wi/Wi-1. "
-            "The product of all fractions gives the overall mission weight fraction."
+            "The product of all fractions gives the overall mission weight fraction "
+            "(Sadraey §2.6, Table 2.4)."
         )
 
         seg_rows = []
         cumulative = 1.0
         for sf in wr.segment_fractions:
-            cumulative *= sf.fraction
+            cumulative *= sf.weight_fraction
             seg_rows.append([
                 sf.segment_label,
-                sf.energy_source_label,
-                f"{sf.fraction:.4f}",
+                sf.segment_type.name,
+                sf.energy_source.value,
+                f"{sf.weight_fraction:.4f}",
                 f"{cumulative:.4f}",
+                f"{sf.cumulative_weight_kg:.3f} kg",
             ])
 
         rb.add_table(
-            headers=["Segment", "Energy Source", "Wi/Wi-1", "Cumulative"],
+            headers=["Segment", "Type", "Energy", "Wi/Wi-1",
+                     "Cumulative", "Remaining kg"],
             rows=seg_rows,
-            caption="Per-segment weight fractions",
+            caption="Per-segment weight fractions and cumulative mass",
         )
 
         # ── Pie chart ─────────────────────────────────────────────────────

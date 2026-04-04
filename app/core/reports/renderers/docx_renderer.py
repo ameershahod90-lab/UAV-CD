@@ -5,10 +5,10 @@ Concrete implementation of ReportBuilder using python-docx.
 
 Design decisions:
   - Uses a custom UAV-CD-APP document style (blue accent, Calibri body).
-  - Equations use Word's native OMML math objects (m:oMath) rendered inside
-    a borderless 3-column table: equation (centre) | spacer | (Eq. N) right.
-    This produces real Word equation objects — editable via Word's equation
-    editor — not plain-text approximations.
+  - Equations use Word's native OMML math objects (m:oMath) inside a single
+    paragraph with a right-aligned tab stop for the equation number.
+    This produces real Word equation objects — editable via Word's built-in
+    equation editor — without any table wrapper that might show borders.
   - Tables use 'Table Grid' style with blue header row and alternating rows.
   - Figures are written to a NamedTemporaryFile, inserted, then cleaned up.
   - All widths are specified in centimetres (docx uses EMU internally).
@@ -16,19 +16,17 @@ Design decisions:
 
 from __future__ import annotations
 
-import copy
 import io
 import math
 import tempfile
 import os
-from pathlib import Path
 from typing import Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
-from docx.shared import Cm, Pt, RGBColor, Twips
+from docx.shared import Cm, Pt, RGBColor
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from lxml import etree
 
@@ -40,7 +38,6 @@ _DARK   = RGBColor(0x2C, 0x2C, 0x2C)   # body text (near-black)
 _GREY   = RGBColor(0xF0, 0xF0, 0xF0)   # note background
 _ACCENT = RGBColor(0x27, 0xAE, 0x60)   # green accent for values
 _WHITE  = RGBColor(0xFF, 0xFF, 0xFF)
-
 
 # OMML (Office Math Markup Language) namespace
 _MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -57,32 +54,17 @@ def _shade_cell(cell, fill_hex: str) -> None:
     tc_pr.append(shd)
 
 
-def _remove_cell_borders(cell) -> None:
-    """Make a table cell have no visible borders."""
-    tc_pr = cell._tc.get_or_add_tcPr()
-    tc_borders = OxmlElement("w:tcBorders")
-    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
-        el = OxmlElement(f"w:{side}")
-        el.set(qn("w:val"), "none")
-        tc_borders.append(el)
-    tc_pr.append(tc_borders)
-
-
-def _make_omml_paragraph(equation_text: str) -> etree._Element:
+def _make_omath(equation_text: str) -> etree._Element:
     """
-    Build a Word OMML math paragraph (m:oMathPara > m:oMath > m:r > m:t)
-    from a Unicode math string.
+    Build an OMML <m:oMath> inline element from a Unicode math string.
 
-    Word renders <m:oMath> inside a <w:p> as a displaystyle equation object
-    that is fully editable via Word's equation editor.
-    The Unicode subscripts/superscripts/operators in equation_text are
-    preserved as-is; Word styles them as math.
+    When appended to a <w:p> element, Word renders it as a displayed equation
+    object that is fully editable via Word's built-in equation editor.
+    Unicode math characters (₀ ² · etc.) are preserved inside the math run.
     """
     oMath = etree.Element(f"{_M}oMath")
     r = etree.SubElement(oMath, f"{_M}r")
-    # Math run properties: use Cambria Math
-    rPr = etree.SubElement(r, f"{_M}rPr")
-    nor = etree.SubElement(rPr, f"{_M}nor")  # normal text = off → italic math
+    # <m:rPr> — no <m:nor> so the text is styled as math (italic by default)
     t = etree.SubElement(r, f"{_M}t")
     t.text = equation_text
     return oMath
@@ -97,6 +79,7 @@ class DocxBuilder(ReportBuilder):
         self._section_counter: int = 0
         self._figure_counter:  int = 0
         self._table_counter:   int = 0
+        self._eq_counter:      int = 0
         self._setup_document()
 
     # ── Document setup ────────────────────────────────────────────────────
@@ -250,58 +233,63 @@ class DocxBuilder(ReportBuilder):
         """
         Add a displayed equation as a real Word OMML math object.
 
-        Layout (borderless 3-column table):
-          [ equation (OMML, centred, ~75% width) ] | [ ] | [ (Eq. N) right ]
+        Layout — single paragraph with:
+          [OMML math object (centred)]  [right-aligned tab]  [(Eq. N)]
 
-        The equation is a genuine Word equation object — click to edit in
+        The equation is a genuine Word equation object — click it to edit in
         Word's built-in equation editor.  Unicode math symbols are preserved.
 
-        The Sadraey reference (if given) appears as a small italic paragraph
-        indented below.
+        Uses a tab stop at 15.0 cm for the right-aligned equation number,
+        avoiding any table wrapper (which caused border-visibility issues).
         """
+        self._eq_counter += 1
+
+        # Build a paragraph that will hold the OMML + optional eq number
+        p = self._doc.add_paragraph()
+        pPr = p._p.get_or_add_pPr()
+
+        # Paragraph indent: 2 cm left so the equation is visually inset
+        ind = OxmlElement("w:ind")
+        ind.set(qn("w:left"), "567")   # 1 cm ≈ 567 twips
+        pPr.append(ind)
+
+        # Tab stop at 13.5 cm, right-aligned (for eq number)
         if eq_number:
-            # Borderless 3-column table: eq | gap | (Eq. N)
-            tbl = self._doc.add_table(rows=1, cols=3)
-            tbl.style = "Table Grid"
-            tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+            tabs = OxmlElement("w:tabs")
+            tab = OxmlElement("w:tab")
+            tab.set(qn("w:val"), "right")
+            tab.set(qn("w:pos"), "8504")   # 15 cm ≈ 8504 twips
+            tabs.append(tab)
+            pPr.append(tabs)
 
-            # Column widths (total usable ≈ 15.5 cm for A4 with our margins)
-            widths = [Cm(11.0), Cm(1.5), Cm(3.0)]
-            for i, (cell, w) in enumerate(zip(tbl.rows[0].cells, widths)):
-                _remove_cell_borders(cell)
-                cell.width = w
+        # Insert the OMML <m:oMath> element directly into the <w:p>
+        oMath = _make_omath(equation_text)
+        p._p.append(oMath)
 
-            # Col 0: OMML equation
-            eq_cell = tbl.rows[0].cells[0]
-            eq_para = eq_cell.paragraphs[0]
-            eq_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            oMath = _make_omml_paragraph(equation_text)
-            eq_para._p.append(oMath)
+        # Append equation number as a plain run after a tab
+        if eq_number:
+            # tab run
+            tab_r = OxmlElement("w:r")
+            tab_t = OxmlElement("w:tab")
+            tab_r.append(tab_t)
+            p._p.append(tab_r)
 
-            # Col 2: equation number, right-aligned
-            num_cell = tbl.rows[0].cells[2]
-            num_para = num_cell.paragraphs[0]
-            num_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            num_run = num_para.add_run(f"(Eq. {eq_number})")
-            num_run.font.size = Pt(10)
-            num_run.font.color.rgb = RGBColor(0x60, 0x60, 0x60)
+            # number run
+            num_r = OxmlElement("w:r")
+            rPr = OxmlElement("w:rPr")
+            sz = OxmlElement("w:sz")
+            sz.set(qn("w:val"), "20")   # 10pt
+            rPr.append(sz)
+            color = OxmlElement("w:color")
+            color.set(qn("w:val"), "606060")
+            rPr.append(color)
+            num_r.append(rPr)
+            num_t = OxmlElement("w:t")
+            num_t.text = f"(Eq. {eq_number})"
+            num_r.append(num_t)
+            p._p.append(num_r)
 
-            # Remove table outer borders
-            tbl_pr = tbl._tbl.get_or_add_tblPr()
-            tbl_bdr = OxmlElement("w:tblBorders")
-            for side in ("top", "left", "bottom", "right",
-                          "insideH", "insideV"):
-                el = OxmlElement(f"w:{side}")
-                el.set(qn("w:val"), "none")
-                tbl_bdr.append(el)
-            tbl_pr.append(tbl_bdr)
-        else:
-            # No equation number — just a centred OMML paragraph
-            p = self._doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            oMath = _make_omml_paragraph(equation_text)
-            p._p.append(oMath)
-
+        # Reference line below (Sadraey §X.X)
         if reference:
             ref_p = self._doc.add_paragraph(f"    {reference}")
             if ref_p.runs:
@@ -310,19 +298,14 @@ class DocxBuilder(ReportBuilder):
                 ref_p.runs[0].font.color.rgb = RGBColor(0x60, 0x60, 0x60)
             ref_p.paragraph_format.left_indent = Cm(1.5)
 
-        self._doc.add_paragraph()   # small spacer
-
     def add_key_value_list(
         self,
         items: list[tuple[str, str]],
         columns: int = 2,
     ) -> None:
-        """Render as a borderless two-column table (label | value)."""
+        """Render as a bordered two-column table (label | value)."""
         if not items:
             return
-        # Split into two side-by-side pairs if columns=2
-        half = math.ceil(len(items) / columns) if columns > 1 else len(items)
-        # Always render as a single 2-column table (Label | Value)
         table = self._doc.add_table(rows=len(items), cols=2)
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.LEFT
@@ -344,7 +327,7 @@ class DocxBuilder(ReportBuilder):
         p = self._doc.add_paragraph()
         p.paragraph_format.left_indent  = Cm(1.0)
         p.paragraph_format.right_indent = Cm(1.0)
-        run = p.add_run(f"📌  {text}")
+        run = p.add_run(f"Note:  {text}")
         run.italic = True
         run.font.size = Pt(10)
         run.font.color.rgb = RGBColor(0x4A, 0x4A, 0x4A)

@@ -198,13 +198,5 @@ class ExportService:
     ) -> None:
         sections = SectionRegistry.enabled_sections(config.sections)
         for section_cls in sections:
-            try:
-                section_cls().build(ctx, rb)
-                rb.add_horizontal_rule()
-            except Exception as exc:
-                _LOG.error(
-                    "Section '%s' failed: %s", section_cls.section_id, exc
-                )
-                rb.add_note(
-                    f"[Section '{section_cls.title}' could not be rendered: {exc}]"
-                )
+            section_cls().build(ctx, rb)
+            rb.add_horizontal_rule()
