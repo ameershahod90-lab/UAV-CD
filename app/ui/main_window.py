@@ -31,6 +31,7 @@ from app.ui.tabs.sizing.mission_tab import MissionTab
 from app.ui.tabs.sizing.output_tab import OutputTab
 from app.ui.tabs.sizing.weight_tab import WeightTab
 from app.ui.themes import QSS_DARK, QSS_LIGHT
+from app.ui.dialogs.export_dialog import ExportDialog
 
 
 _FILTER = "UAV-CD Project (*.uavcd);;All Files (*)"
@@ -67,11 +68,16 @@ class MainWindow(QMainWindow):
 
         # Sizing tab (sub-tabbed)
         sizing_tabs = QTabWidget()
-        sizing_tabs.addTab(GeneralTab(store),     "⚙  General")
-        sizing_tabs.addTab(MissionTab(store),     "📋  Mission")
-        sizing_tabs.addTab(WeightTab(store),      "⚖  Weight")
-        sizing_tabs.addTab(ConstraintsTab(store), "📊  Constraints")
-        sizing_tabs.addTab(OutputTab(store),      "🎯  Output")
+        self._general_tab     = GeneralTab(store)
+        self._mission_tab     = MissionTab(store)
+        self._weight_tab      = WeightTab(store)
+        self._constraints_tab = ConstraintsTab(store)
+        self._output_tab      = OutputTab(store)
+        sizing_tabs.addTab(self._general_tab,     "⚙  General")
+        sizing_tabs.addTab(self._mission_tab,     "📋  Mission")
+        sizing_tabs.addTab(self._weight_tab,      "⚖  Weight")
+        sizing_tabs.addTab(self._constraints_tab, "📊  Constraints")
+        sizing_tabs.addTab(self._output_tab,      "🎯  Output")
         root.addTab(sizing_tabs, "Phase 1 — Initial Sizing")
 
         # Historical data tab (placeholder for now — full implementation next)
@@ -137,7 +143,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Save",           self._save,         "Ctrl+S"))
         file_menu.addAction(self._action("Save As…",       self._save_as,      "Ctrl+Shift+S"))
         file_menu.addSeparator()
-        file_menu.addAction(self._action("Exit",           self.close,         "Alt+F4"))
+        file_menu.addAction(self._action("Export Report…", self._export_report, "Ctrl+E"))
+        file_menu.addSeparator()
+        file_menu.addAction(self._action("Exit",           self.close,          "Alt+F4"))
 
         # View
         view_menu = mb.addMenu("&View")
@@ -203,6 +211,31 @@ class MainWindow(QMainWindow):
             self._status_lbl.setText(
                 f"⚠  {len(violations)} constraint violation(s) detected"
             )
+
+    # ── Export ───────────────────────────────────────────────────────────
+
+    def _export_report(self) -> None:
+        """Open the Export Report dialog, passing live-widget figure grabbers."""
+        from PyQt6.QtGui import QPixmap
+        import io
+
+        def _grab_widget(widget) -> bytes:
+            """Capture a widget's content as PNG bytes."""
+            pixmap: QPixmap = widget.grab()
+            buf = io.BytesIO()
+            # Qt pixmap → PNG bytes via QBuffer
+            from PyQt6.QtCore import QBuffer, QIODeviceBase
+            qbuf = QBuffer()
+            qbuf.open(QIODeviceBase.OpenModeFlag.WriteOnly)
+            pixmap.save(qbuf, "PNG")
+            return bytes(qbuf.data())
+
+        grabbers = {
+            "matching_diagram": lambda: _grab_widget(self._constraints_tab._plot),
+            "mission_profile":  lambda: _grab_widget(self._mission_tab._diagram),
+        }
+        dlg = ExportDialog(self._store, grabbers, parent=self)
+        dlg.exec()
 
     # ── Helpers ───────────────────────────────────────────────────────────
 
