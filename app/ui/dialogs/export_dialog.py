@@ -84,20 +84,40 @@ class _ExportWorker(QObject):
 # ===========================================================================
 
 class _SectionRow(QWidget):
-    """One row in the sections list: checkbox + title + up/down buttons."""
+    """One row in the sections list: grip + checkbox + category badge."""
 
     def __init__(self, entry: SectionEntry, title: str, description: str,
+                 category_label: str,
                  parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._entry = entry
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(6)
 
+        # Drag grip indicator — visible cue so users know they can drag rows
+        grip = QLabel("⠿")
+        grip.setFixedWidth(18)
+        grip.setToolTip("Drag to reorder")
+        grip.setStyleSheet(
+            "color: #1A5C96; font-size: 18px; font-weight: bold;"
+            "background: transparent;"
+        )
+        layout.addWidget(grip)
+
+        # Checkbox with section title
         self._check = QCheckBox(title)
         self._check.setChecked(entry.enabled)
         self._check.setToolTip(description)
         self._check.toggled.connect(self._on_toggle)
         layout.addWidget(self._check, stretch=1)
+
+        # Category badge
+        badge = QLabel(category_label)
+        badge.setStyleSheet(
+            "color: #888; font-size: 9px; background: transparent;"
+        )
+        layout.addWidget(badge)
 
     def _on_toggle(self, checked: bool) -> None:
         self._entry.enabled = checked
@@ -105,6 +125,10 @@ class _SectionRow(QWidget):
     @property
     def entry(self) -> SectionEntry:
         return self._entry
+
+    @property
+    def is_enabled(self) -> bool:
+        return self._check.isChecked()
 
 
 # ===========================================================================
@@ -183,11 +207,18 @@ class ExportDialog(QDialog):
         layout.addWidget(opts_group)
 
         # ── Sections list ─────────────────────────────────────────────────
-        sec_group = QGroupBox("Sections  (check to include, use ▲/▼ to reorder)")
+        sec_group = QGroupBox(
+            "Sections  —  ☑ to include  •  ⠿ drag or ▲/▼ buttons to reorder"
+        )
         sec_outer = QVBoxLayout(sec_group)
 
         self._list = QListWidget()
         self._list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self._list.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self._list.setDragEnabled(True)
+        self._list.setAcceptDrops(True)
+        self._list.setDropIndicatorShown(True)
+        self._list.setMinimumHeight(280)
         self._populate_sections()
         sec_outer.addWidget(self._list)
 
@@ -221,42 +252,71 @@ class ExportDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         layout.addWidget(btn_box)
 
-    def _populate_sections(self) -> None:
-        """Populate the QListWidget from self._entries, preserving order."""
+    def _populate_sections(self, selected_row: int = -1) -> None:
+        """
+        Rebuild the QListWidget entirely from self._entries.
+
+        self._entries is the single source of truth for order and enabled state.
+        This approach avoids the Qt bug where takeItem/insertItem drops itemWidget
+        associations, causing rows to appear blank after reordering.
+        """
+        # Before rebuilding, sync enabled states from existing widgets
+        self._sync_enabled_from_widgets()
+
         self._list.clear()
         sections_by_id = {
             cls.section_id: cls
             for cls in SectionRegistry.all_sections()
         }
-        for entry in sorted(self._entries, key=lambda e: e.order):
+        for entry in self._entries:   # already in desired order
             cls = sections_by_id.get(entry.section_id)
             if cls is None:
                 continue
-            row_widget = _SectionRow(entry, cls.title, cls.description)
+            row_widget = _SectionRow(
+                entry, cls.title, cls.description,
+                cls.category.value,
+            )
             item = QListWidgetItem(self._list)
             item.setSizeHint(row_widget.sizeHint())
             self._list.setItemWidget(item, row_widget)
 
+        if 0 <= selected_row < self._list.count():
+            self._list.setCurrentRow(selected_row)
+
+    def _sync_enabled_from_widgets(self) -> None:
+        """Copy enabled state from current widgets into self._entries."""
+        for i in range(self._list.count()):
+            item   = self._list.item(i)
+            widget = self._list.itemWidget(item)
+            if isinstance(widget, _SectionRow):
+                widget.entry.enabled = widget.is_enabled
+
     def _move_up(self) -> None:
         row = self._list.currentRow()
-        if row > 0:
-            item = self._list.takeItem(row)
-            self._list.insertItem(row - 1, item)
-            self._list.setCurrentRow(row - 1)
+        if row <= 0 or row >= len(self._entries):
+            return
+        # Sync enabled state first, then swap in the source-of-truth list
+        self._sync_enabled_from_widgets()
+        self._entries[row], self._entries[row - 1] = (
+            self._entries[row - 1], self._entries[row]
+        )
+        self._populate_sections(selected_row=row - 1)
 
     def _move_down(self) -> None:
         row = self._list.currentRow()
-        if row < self._list.count() - 1:
-            item = self._list.takeItem(row)
-            self._list.insertItem(row + 1, item)
-            self._list.setCurrentRow(row + 1)
+        if row < 0 or row >= len(self._entries) - 1:
+            return
+        self._sync_enabled_from_widgets()
+        self._entries[row], self._entries[row + 1] = (
+            self._entries[row + 1], self._entries[row]
+        )
+        self._populate_sections(selected_row=row + 1)
 
     def _set_all(self, checked: bool) -> None:
-        for i in range(self._list.count()):
-            item = self._list.item(i)
-            widget = self._list.itemWidget(item)
-            if isinstance(widget, _SectionRow):
-                widget._check.setChecked(checked)
+        self._sync_enabled_from_widgets()
+        for entry in self._entries:
+            entry.enabled = checked
+        self._populate_sections(selected_row=self._list.currentRow())
 
     def _browse(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
@@ -270,16 +330,11 @@ class ExportDialog(QDialog):
     # ── Export ────────────────────────────────────────────────────────────
 
     def _collect_manifest(self) -> list[SectionEntry]:
-        """Read current state of the sections list widget."""
-        manifest = []
-        for i in range(self._list.count()):
-            item   = self._list.item(i)
-            widget = self._list.itemWidget(item)
-            if isinstance(widget, _SectionRow):
-                entry = widget.entry
-                entry.order = i * 10
-                manifest.append(entry)
-        return manifest
+        """Sync enabled state from widgets and return self._entries as manifest."""
+        self._sync_enabled_from_widgets()
+        for i, entry in enumerate(self._entries):
+            entry.order = i * 10
+        return list(self._entries)
 
     def _export(self) -> None:
         output_path = self._path_edit.text().strip()
