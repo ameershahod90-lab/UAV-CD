@@ -27,8 +27,8 @@ class WeightBreakdownSection(ReportSection):
 
         dc  = ctx.display_converter
         b   = ctx.brief
-        is_fuel = b.propulsion_type.is_fuel_mode
-        is_elec = not b.propulsion_type.is_fuel_mode and not b.propulsion_type.is_hybrid
+        is_fuel = b.propulsion_type.uses_fuel
+        is_elec = not b.propulsion_type.uses_fuel 
 
         rb.add_paragraph(
             "Takeoff weight is estimated using the iterative Breguet mission "

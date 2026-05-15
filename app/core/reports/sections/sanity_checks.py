@@ -27,9 +27,8 @@ class SanityChecksSection(ReportSection):
 
         _ICONS = {
             SanityCheckStatus.PASS:    "✓  PASS",
-            SanityCheckStatus.WARNING: "⚠  WARN",
+            SanityCheckStatus.WARN: "⚠  WARN",
             SanityCheckStatus.FAIL:    "✗  FAIL",
-            SanityCheckStatus.UNKNOWN: "?  N/A",
         }
 
         rows = []

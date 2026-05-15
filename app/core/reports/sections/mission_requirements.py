@@ -39,9 +39,9 @@ class MissionRequirementsSection(ReportSection):
         ]
 
         # Propulsion-specific fields
-        if b.propulsion_type.is_fuel_mode or b.propulsion_type.is_hybrid:
+        if b.propulsion_type.uses_fuel:
             rows.append(["SFC", f"{b.specific_fuel_consumption_g_wh:.4f} g/(W·h)", "Specific fuel consumption"])
-        if not b.propulsion_type.is_fuel_mode or b.propulsion_type.is_hybrid:
+        if not b.propulsion_type.uses_fuel:
             rows.append(["Battery Energy Density",
                          f"{b.battery_energy_density_wh_kg:.1f} Wh/kg",
                          "Li-Po cell specific energy"])

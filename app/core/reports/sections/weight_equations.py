@@ -5,6 +5,8 @@ Gated on ctx.include_equations so user can toggle with the
 'Include equation blocks' checkbox in the export dialog.
 """
 from __future__ import annotations
+
+from app.core.enums import PropulsionType
 from app.core.reports.base import ReportSection, ReportContext, SectionCategory
 from app.core.reports.renderer import ReportBuilder
 
@@ -115,8 +117,8 @@ class WeightEquationsSection(ReportSection):
             caption="Sadraey Table 2.4 — fixed-segment weight fractions",
         )
 
-        is_fuel = b.propulsion_type.is_fuel_mode
-        is_elec = not b.propulsion_type.is_fuel_mode and not b.propulsion_type.is_hybrid
+        is_fuel = b.propulsion_type.uses_fuel
+        is_elec = not b.propulsion_type.uses_fuel
 
         if is_fuel:
             # Fuel-based propulsion
@@ -173,7 +175,7 @@ class WeightEquationsSection(ReportSection):
                 ("e_bat",    "Battery specific energy density [Wh/kg]"),
             ])
 
-        if b.propulsion_type.is_hybrid:
+        if b.propulsion_type is PropulsionType.HYBRID:
             rb.add_heading("6.  Hybrid Propulsion — Mixed Fractions", level=2)
             rb.add_paragraph(
                 "Each segment uses either the Breguet fuel fraction or the "
