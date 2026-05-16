@@ -148,6 +148,9 @@ class ConstraintsTab(QWidget):
         self._plot.setLabel("bottom", f"Wing Loading W/S [{ws_unit}]")
         self._plot.setLabel("left", y_label)
 
+        # First pass: convert all curves to display units; remember the
+        # design-point loading so we can scale the Y axis around it.
+        curves_display: list[tuple[str, str, np.ndarray, np.ndarray]] = []
         for curve in result.curves:
             xs = np.asarray(curve.wing_loading_values)
             ys = np.asarray(curve.loading_values)
@@ -156,21 +159,44 @@ class ConstraintsTab(QWidget):
                 np.array([dc.power_loading(v)[0] for v in ys])
                 if result.is_power_loading_mode else ys
             )
+            curves_display.append((curve.name, curve.color_hex, ws_d, ld_d))
             pen = pg.mkPen(color=curve.color_hex, width=2)
             self._plot.plot(ws_d, ld_d, pen=pen, name=curve.name)
 
-        # Stall vertical line
+        # Compute a sensible Y-axis upper bound. The raw curve maxima can
+        # exceed the design-point loading by 10×+ at small W/S (asymptotic
+        # branches), which squeezes the feasible region to a thin strip at
+        # the bottom and pushes the design-point marker out of view. Clip
+        # to ~2.5× the highest "envelope" point near the design wing-loading,
+        # falling back to the curve median if no design point exists yet.
+        dp = self._store.state.sizing.design_point
+        if dp is not None:
+            dp_ld = (
+                dc.power_loading(dp.power_loading_nw)[0]
+                if result.is_power_loading_mode else dp.power_loading_nw
+            )
+            y_top = max(dp_ld * 2.5, 0.05)
+        else:
+            medians = [float(np.median(ld_d)) for _, _, _, ld_d in curves_display if len(ld_d)]
+            y_top = (max(medians) * 2.0) if medians else 1.0
+
+        # Stall vertical line — drawn within the clipped Y range
         stall_x = dc.wing_loading(result.stall_ws_nm2)[0]
-        y_max = max(
-            (max(c.loading_values) for c in result.curves if c.loading_values),
-            default=1.0,
-        )
-        y_max_d = dc.power_loading(y_max)[0] if result.is_power_loading_mode else y_max
         stall_pen = pg.mkPen(color="#e74c3c", width=2, style=Qt.PenStyle.DashLine)
         self._plot.plot(
-            [stall_x, stall_x], [0, y_max_d * 1.1],
+            [stall_x, stall_x], [0, y_top],
             pen=stall_pen, name="Stall Limit",
         )
+
+        self._plot.setYRange(0.0, y_top, padding=0.05)
+
+        # Re-place the design-point marker if the sizing pipeline has already
+        # produced a design point. Without this, refreshing the constraint
+        # curves (e.g. on settings or brief change) nukes the marker via
+        # self._dp_scatter = None above, and the design_point_changed signal
+        # doesn't re-fire — so the ★ silently disappears.
+        if dp is not None:
+            self._on_design_point()
 
     def _on_design_point(self) -> None:
         dp = self._store.state.sizing.design_point

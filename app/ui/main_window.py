@@ -216,15 +216,35 @@ class MainWindow(QMainWindow):
 
     def _export_report(self) -> None:
         """Open the Export Report dialog, passing live-widget figure grabbers."""
+        from PyQt6.QtCore import QBuffer, QIODeviceBase, QPoint, QRect, QSize
         from PyQt6.QtGui import QPixmap
+        from PyQt6.QtWidgets import QApplication
         import io
 
         def _grab_widget(widget) -> bytes:
-            """Capture a widget's content as PNG bytes."""
-            pixmap: QPixmap = widget.grab()
-            buf = io.BytesIO()
-            # Qt pixmap → PNG bytes via QBuffer
-            from PyQt6.QtCore import QBuffer, QIODeviceBase
+            """Capture a widget's content as PNG bytes.
+
+            Uses ``widget.render()`` rather than ``widget.grab()`` so the capture
+            works even if the widget's parent tab was never shown — pyqtgraph
+            PlotWidget rendering requires at least one layout cycle, and
+            ``grab()`` on an unrealised widget returns only the background.
+            """
+            # Force a layout cycle so size() and child geometry are valid even
+            # if the tab containing this widget was never the current tab.
+            widget.adjustSize()
+            QApplication.processEvents()
+
+            size = widget.size()
+            if size.isEmpty():
+                size = QSize(960, 540)
+            pixmap = QPixmap(size)
+            pixmap.fill(Qt.GlobalColor.white)
+            widget.render(
+                pixmap,
+                QPoint(),
+                QRect(0, 0, size.width(), size.height()),
+            )
+
             qbuf = QBuffer()
             qbuf.open(QIODeviceBase.OpenModeFlag.WriteOnly)
             pixmap.save(qbuf, "PNG")
