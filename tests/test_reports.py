@@ -354,6 +354,99 @@ class TestOMMLBuilder:
         assert reparsed.tag.endswith("}oMath")
 
 
+# ── Auto-numbering, inline math, and citation style ────────────────────────
+
+
+class TestEquationNumberingAndCitations:
+    @pytest.fixture
+    def exported(self, sized_store, tmp_path):
+        out = tmp_path / "numbering.docx"
+        ok, msg = _export(sized_store, out)
+        assert ok, msg
+        return Document(str(out))
+
+    def test_no_section_sign_in_body(self, exported):
+        """The § character should not appear anywhere in the document — we
+        use 'Sec.' instead so the report reads as natural prose."""
+        body = etree.tostring(exported.element).decode("utf-8")
+        # Strip the namespace declarations so § in xml namespaces (none in
+        # this doc, but defensive) doesn't trigger a false positive
+        assert "§" not in body, "Section sign § found in document body"
+
+    def test_auto_numbered_equation_labels(self, exported):
+        """Displayed equations should carry labels of the form (N.M) where
+        N is the level-1 section index and M is the sub-counter."""
+        import re
+
+        body = etree.tostring(exported.element).decode("utf-8")
+        labels = re.findall(r"\((\d+)\.(\d+)\)", body)
+        # Filter out "Sec. 2.9" / "Eq. 2.49-2.51" textual section refs:
+        labels = [(n, m) for n, m in labels if int(n) <= 20 and int(m) <= 99]
+        # We expect at least 5 auto-numbered equations in a default export.
+        assert len(labels) >= 5, f"Too few auto-numbered eq labels: {labels}"
+
+        # Within each section, sub-counters should be 1..K consecutive.
+        from collections import defaultdict
+        per_section = defaultdict(list)
+        for n, m in labels:
+            per_section[int(n)].append(int(m))
+        for section, subs in per_section.items():
+            assert subs == list(range(1, len(subs) + 1)), (
+                f"Section {section} eq numbers are not 1..N consecutive: {subs}"
+            )
+
+    def test_no_legacy_eq_2_dot_prefix_labels(self, exported):
+        """The old per-equation labels were '(Eq. 2.38)', '(Eq. 2.49)', etc.
+        After auto-numbering, no '(Eq. <digit>.<digit>)' should remain."""
+        import re
+
+        body = etree.tostring(exported.element).decode("utf-8")
+        legacy = re.findall(r"\(Eq\.\s*\d+\.\d+\)", body)
+        assert not legacy, f"Legacy (Eq. N.NN) labels still present: {legacy}"
+
+
+class TestInlineMathTemplate:
+    def test_paragraph_inline_math_emits_omml(self, sized_store, tmp_path):
+        """A paragraph containing {{{LaTeX}}} should produce inline OMML
+        alongside the surrounding text."""
+        from app.core.reports.renderers.docx_renderer import DocxBuilder
+        from app.core.reports.renderer import ReportConfig
+
+        out = tmp_path / "inline_math.docx"
+        rb = DocxBuilder(ReportConfig())
+        rb.add_heading("Test Section", level=1)
+        rb.add_paragraph(
+            "The propulsive efficiency {{{\\eta_p}}} appears here, and "
+            "so does {{{\\rho_0 V_s^2}}}."
+        )
+        rb.save(str(out))
+
+        from docx import Document
+        doc = Document(str(out))
+        body = etree.tostring(doc.element).decode("utf-8")
+        # Two inline math sources → two <m:oMath> elements (plus none from
+        # add_equation, since we never called it)
+        omath_count = body.count("<m:oMath>") + body.count("<m:oMath ")
+        assert omath_count == 2, (
+            f"Expected 2 inline OMML elements, found {omath_count}"
+        )
+
+    def test_inline_math_in_default_export(self, sized_store, tmp_path):
+        """Section files use {{{...}}} in their intros / kv-lists. Confirm
+        those round-trip into the rendered .docx as inline OMML."""
+        out = tmp_path / "with_inline.docx"
+        ok, msg = _export(sized_store, out)
+        assert ok, msg
+        body = etree.tostring(Document(str(out)).element).decode("utf-8")
+        # The raw {{{...}}} sigil should NOT appear in the rendered doc
+        assert "{{{" not in body, (
+            "Raw inline-math sigil leaked into the rendered document"
+        )
+        # And at least one inline OMML run should exist (section intros add them)
+        omath_count = body.count("<m:oMath>") + body.count("<m:oMath ")
+        assert omath_count >= 1, "No OMML elements at all — inline math not emitted"
+
+
 # ── Display-rule tests: only relevant data should appear ────────────────────
 
 
@@ -440,8 +533,16 @@ class TestDisplayRules:
 
 
 class TestIncludeEquationsToggle:
-    def test_equations_excluded_when_toggled_off(self, sized_store, tmp_path):
-        cfg = ReportConfig(
+    """include_equations=False skips the displayed (auto-numbered) equation
+    blocks but does NOT scrub inline {{{...}}} math from prose — those are
+    integral to the surrounding sentences."""
+
+    def test_displayed_equations_excluded_when_toggled_off(
+        self, sized_store, tmp_path
+    ):
+        import re
+
+        cfg_off = ReportConfig(
             report_title="No equations",
             author="Test",
             revision="1.0",
@@ -450,14 +551,49 @@ class TestIncludeEquationsToggle:
             output_path=str(tmp_path / "no_eq.docx"),
             include_equations=False,
         )
-        ok, _ = ExportService(sized_store).export(cfg, figure_grabbers={})
+        ok, _ = ExportService(sized_store).export(cfg_off, figure_grabbers={})
         assert ok
-        doc = Document(str(tmp_path / "no_eq.docx"))
-        body_xml = etree.tostring(doc.element).decode("utf-8")
-        # When equations are off, no <m:oMath> should appear
-        has_omml = (
-            f"{{{_OMML_NS}}}oMath" in body_xml or "m:oMath" in body_xml
+        doc_off = Document(str(tmp_path / "no_eq.docx"))
+        body_off = etree.tostring(doc_off.element).decode("utf-8")
+
+        # Auto-numbered displayed equations look like "(7.1)", "(7.2)", etc.
+        # Inline math has no such label. So the toggle's signature is:
+        eq_labels_off = re.findall(r"\(\d+\.\d+\)", body_off)
+        # The cover page shows "Sec. 2.6-2.7" / "Eq. 2.49-2.51" — those are
+        # textual section references, not auto-numbered equation labels.
+        # Filter them out:
+        eq_labels_off = [
+            lbl for lbl in eq_labels_off
+            if "Sec." not in lbl and "Eq." not in lbl
+        ]
+        assert not eq_labels_off, (
+            f"include_equations=False but auto-numbered eq labels still appear: "
+            f"{eq_labels_off[:5]}"
         )
-        assert not has_omml, (
-            "include_equations=False but OMML elements still present"
+
+    def test_displayed_equations_present_when_toggled_on(
+        self, sized_store, tmp_path
+    ):
+        import re
+
+        cfg_on = ReportConfig(
+            report_title="With equations",
+            author="Test",
+            revision="1.0",
+            format=ExportFormat.DOCX,
+            sections=SectionRegistry.default_manifest(),
+            output_path=str(tmp_path / "with_eq.docx"),
+            include_equations=True,
+        )
+        ok, _ = ExportService(sized_store).export(cfg_on, figure_grabbers={})
+        assert ok
+        doc_on = Document(str(tmp_path / "with_eq.docx"))
+        body_on = etree.tostring(doc_on.element).decode("utf-8")
+        eq_labels_on = re.findall(r"\(\d+\.\d+\)", body_on)
+        eq_labels_on = [
+            lbl for lbl in eq_labels_on
+            if "Sec." not in lbl and "Eq." not in lbl
+        ]
+        assert len(eq_labels_on) >= 5, (
+            f"Expected auto-numbered equation labels; only found {eq_labels_on}"
         )

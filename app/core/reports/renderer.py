@@ -136,18 +136,16 @@ class ReportBuilder(ABC):
         ...
 
     @abstractmethod
-    def add_equation(
-        self,
-        equation_text: str,
-        eq_number: str = "",
-        reference: str = "",
-    ) -> None:
-        """
-        Add a displayed equation block.
-        equation_text — the equation in plain Unicode math notation
-                        e.g. "W/S = ½ρ₀·Vs²·CLmax"
-        eq_number     — e.g. "2.38" (shown right-aligned)
-        reference     — e.g. "Sadraey §2.9" (shown as sub-caption)
+    def add_equation(self, equation_text: str) -> None:
+        """Add a displayed equation block.
+
+        equation_text — LaTeX math source, e.g.
+            ``r"\\frac{W}{S} = \\tfrac{1}{2}\\rho_0 V_s^2 C_{L_{\\max}}"``
+
+        The renderer auto-numbers equations as ``(section.sub)``; the
+        section counter advances on every level-1 heading, and the sub
+        counter resets per section. Sadraey citations should appear once
+        in the section's introductory paragraph, not under each equation.
         """
         ...
 

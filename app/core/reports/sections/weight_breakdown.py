@@ -31,9 +31,10 @@ class WeightBreakdownSection(ReportSection):
         is_elec = not b.propulsion_type.uses_fuel 
 
         rb.add_paragraph(
-            "Takeoff weight is estimated using the iterative Breguet mission "
-            "fraction method (Sadraey §2.6-2.7).  The weight loop converges "
-            "when successive MTOW estimates differ by less than 0.1 g."
+            "Takeoff weight is estimated using the iterative Breguet "
+            "mission-fraction method (Sadraey 2020, Sec. 2.6-2.7). The "
+            "weight loop converges when successive MTOW estimates differ by "
+            "less than 0.1 g."
         )
 
         # ── Top-level weight summary ──────────────────────────────────────
@@ -80,9 +81,9 @@ class WeightBreakdownSection(ReportSection):
         # ── Per-segment weight fractions ──────────────────────────────────
         rb.add_heading("Segment Weight Fractions", level=2)
         rb.add_paragraph(
-            "Each segment reduces the aircraft weight by its fraction Wi/Wi-1. "
-            "The product of all fractions gives the overall mission weight fraction "
-            "(Sadraey §2.6, Table 2.4)."
+            "Each segment reduces the aircraft weight by its fraction "
+            "{{{W_i/W_{i-1}}}}. The product of all fractions gives the overall "
+            "mission weight fraction (Sadraey 2020, Sec. 2.6, Table 2.4)."
         )
 
         seg_rows = []

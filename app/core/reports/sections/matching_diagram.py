@@ -57,7 +57,7 @@ class MatchingDiagramSection(ReportSection):
             rb.add_table(
                 headers=["Constraint", "Source"],
                 rows=rows,
-                caption="Active constraint boundaries (Sadraey §2.9)",
+                caption="Active constraint boundaries (Sadraey 2020, Sec. 2.9)",
             )
 
         if dp is not None:

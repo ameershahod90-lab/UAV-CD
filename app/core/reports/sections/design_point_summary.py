@@ -13,11 +13,16 @@ class DesignPointSummarySection(ReportSection):
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
         rb.add_heading(self.title, level=1)
-        rb.add_paragraph(
+        intro = (
             "From the selected design point on the matching diagram, the "
-            "fundamental aircraft sizing quantities are derived using the "
-            "following relationships (Sadraey §2.9, Eq. 2.49-2.51)."
+            "fundamental aircraft sizing quantities — wing reference area "
+            "{{{S}}}, wingspan {{{b}}}, and required engine power or thrust "
+            "— are derived using the following relationships"
         )
+        if ctx.include_sadraey_refs:
+            intro += " (Sadraey 2020, Sec. 2.9, Eq. 2.49-2.51)"
+        intro += "."
+        rb.add_paragraph(intro)
 
         dp = ctx.design_point
         if dp is None:
@@ -31,24 +36,11 @@ class DesignPointSummarySection(ReportSection):
         # Equations — only the one relevant to the propulsion loading mode
         if ctx.include_equations:
             rb.add_heading("Sizing Equations", level=2)
-            ref = "Sadraey §2.9" if ctx.include_sadraey_refs else ""
-            rb.add_equation(
-                r"S = \frac{W_{TO}}{(W/S)_{d}}",
-                eq_number="2.49",
-                reference=ref,
-            )
+            rb.add_equation(r"S = \frac{W_{TO}}{(W/S)_{d}}")
             if is_power:
-                rb.add_equation(
-                    r"P = \frac{W_{TO}}{(W/P)_{d}}",
-                    eq_number="2.50",
-                    reference=ref,
-                )
+                rb.add_equation(r"P = \frac{W_{TO}}{(W/P)_{d}}")
             else:
-                rb.add_equation(
-                    r"T = (T/W)_{d} \cdot W_{TO}",
-                    eq_number="2.51",
-                    reference=ref,
-                )
+                rb.add_equation(r"T = (T/W)_{d} \cdot W_{TO}")
             rb.add_equation(r"b = \sqrt{AR \cdot S}")
 
             # Variable definitions — show only the loading row that applies

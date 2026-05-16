@@ -9,6 +9,13 @@ Design decisions:
     paragraph with a right-aligned tab stop for the equation number.
     This produces real Word equation objects — editable via Word's built-in
     equation editor — without any table wrapper that might show borders.
+  - Equation numbers are auto-generated as (section.subnum) — sections call
+    ``add_equation(latex_src)`` with no number argument; the renderer
+    assigns and resets the sub-counter on each level-1 heading.
+  - Inline math: anywhere text is rendered (add_paragraph, add_note,
+    key-value list values, table cells), the sigil ``{{{LaTeX}}}`` is
+    detected and converted to an inline OMML run.  Example:
+        rb.add_paragraph("The efficiency {{{\\eta_p}}} captures losses.")
   - Tables use 'Table Grid' style with blue header row and alternating rows.
   - Figures are written to a NamedTemporaryFile, inserted, then cleaned up.
   - All widths are specified in centimetres (docx uses EMU internally).
@@ -18,6 +25,7 @@ from __future__ import annotations
 
 import io
 import math
+import re
 import tempfile
 import os
 from typing import Optional
@@ -68,6 +76,45 @@ def _make_omath(equation_src: str) -> etree._Element:
     return latex_to_omml(equation_src)
 
 
+# Inline math sigil. Any occurrence of ``{{{LATEX}}}`` inside a text
+# argument (paragraph, note, table cell, kv-value, …) is replaced by a real
+# inline OMML run. Triple-brace ensures the sigil won't collide with normal
+# prose. The pattern is non-greedy and DOTALL so newlines inside the math
+# source are allowed.
+_INLINE_MATH = re.compile(r"\{\{\{(.+?)\}\}\}", re.DOTALL)
+
+
+def _emit_text_with_math(
+    paragraph,
+    text: str,
+    *,
+    bold: bool = False,
+    italic: bool = False,
+) -> None:
+    """Append runs to ``paragraph`` for ``text``, converting any
+    ``{{{LaTeX}}}`` segments to inline OMML math.
+
+    Plain text segments become regular ``<w:r>`` runs (honouring
+    bold/italic); math segments become inline ``<m:oMath>`` elements
+    appended directly to the paragraph's ``<w:p>``.
+    """
+    pos = 0
+    for m in _INLINE_MATH.finditer(text):
+        before = text[pos:m.start()]
+        if before:
+            run = paragraph.add_run(before)
+            run.bold = bold
+            run.italic = italic
+        # Append the OMML element directly to the <w:p> (not wrapped in a run)
+        paragraph._p.append(latex_to_omml(m.group(1)))
+        pos = m.end()
+    tail = text[pos:]
+    if tail:
+        run = paragraph.add_run(tail)
+        run.bold = bold
+        run.italic = italic
+
+
 class DocxBuilder(ReportBuilder):
     """Word (.docx) implementation of the ReportBuilder interface."""
 
@@ -77,7 +124,7 @@ class DocxBuilder(ReportBuilder):
         self._section_counter: int = 0
         self._figure_counter:  int = 0
         self._table_counter:   int = 0
-        self._eq_counter:      int = 0
+        self._eq_subcounter:   int = 0   # resets on every level-1 heading
         self._setup_document()
 
     # ── Document setup ────────────────────────────────────────────────────
@@ -123,6 +170,7 @@ class DocxBuilder(ReportBuilder):
     def add_heading(self, text: str, level: int = 1) -> None:
         if level == 1:
             self._section_counter += 1
+            self._eq_subcounter = 0   # restart equation numbering per section
             numbered = f"{self._section_counter}.  {text}"
         else:
             numbered = text
@@ -138,9 +186,7 @@ class DocxBuilder(ReportBuilder):
         p = self._doc.add_paragraph()
         if indent:
             p.paragraph_format.left_indent = Cm(1)
-        run = p.add_run(text)
-        run.bold   = bold
-        run.italic = italic
+        _emit_text_with_math(p, text, bold=bold, italic=italic)
 
     def add_page_break(self) -> None:
         self._doc.add_page_break()
@@ -163,25 +209,28 @@ class DocxBuilder(ReportBuilder):
         # Header row
         hdr_cells = table.rows[0].cells
         for i, hdr in enumerate(headers):
-            hdr_cells[i].text = hdr
-            _shade_cell(hdr_cells[i], "1A5C96")
-            p = hdr_cells[i].paragraphs[0]
-            run = p.runs[0] if p.runs else p.add_run(hdr)
-            run.bold = True
-            run.font.color.rgb = _WHITE
+            cell = hdr_cells[i]
+            _shade_cell(cell, "1A5C96")
+            p = cell.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            _emit_text_with_math(p, str(hdr), bold=True)
+            # White text on the blue header — recolor whatever runs ended up there
+            for run in p.runs:
+                run.font.color.rgb = _WHITE
 
         # Data rows
         for r_idx, row_data in enumerate(rows):
             cells = table.rows[r_idx + 1].cells
             fill = "F5F5F5" if r_idx % 2 == 0 else "FFFFFF"
             for c_idx, cell_text in enumerate(row_data):
-                cells[c_idx].text = str(cell_text)
-                _shade_cell(cells[c_idx], fill)
-                cells[c_idx].paragraphs[0].alignment = (
+                cell = cells[c_idx]
+                _shade_cell(cell, fill)
+                p = cell.paragraphs[0]
+                p.alignment = (
                     WD_ALIGN_PARAGRAPH.CENTER if c_idx > 0
                     else WD_ALIGN_PARAGRAPH.LEFT
                 )
+                _emit_text_with_math(p, str(cell_text))
 
         if caption:
             cap_p = self._doc.add_paragraph(
@@ -222,86 +271,75 @@ class DocxBuilder(ReportBuilder):
 
         self._doc.add_paragraph()
 
-    def add_equation(
-        self,
-        equation_text: str,
-        eq_number: str = "",
-        reference: str = "",
-    ) -> None:
-        """
-        Add a displayed equation as a real Word OMML math object.
+    def add_equation(self, equation_text: str) -> None:
+        """Add a displayed equation as a real Word OMML math object.
 
         Layout — single paragraph with:
-          [OMML math object (centred)]  [right-aligned tab]  [(Eq. N)]
+            [indent][OMML math object][right-aligned tab][(section.sub)]
 
-        The equation is a genuine Word equation object — click it to edit in
-        Word's built-in equation editor.  Unicode math symbols are preserved.
+        The equation number is auto-generated as ``(section.sub)`` where
+        ``section`` is the current level-1 heading count and ``sub`` is the
+        equation sequence within that section (reset on every new section).
 
-        Uses a tab stop at 15.0 cm for the right-aligned equation number,
-        avoiding any table wrapper (which caused border-visibility issues).
+        The equation itself is a genuine Word equation object — click it to
+        edit in Word's built-in equation editor.
+
+        Sadraey references should appear once in the section's introductory
+        paragraph (e.g. "follows Sadraey 2020, Sec. 2.9"), not under each
+        equation.
         """
-        self._eq_counter += 1
+        self._eq_subcounter += 1
+        eq_number = f"{self._section_counter}.{self._eq_subcounter}"
 
-        # Build a paragraph that will hold the OMML + optional eq number
+        # Build a paragraph that will hold the OMML + the right-aligned number
         p = self._doc.add_paragraph()
         pPr = p._p.get_or_add_pPr()
 
-        # Paragraph indent: 2 cm left so the equation is visually inset
+        # Paragraph indent: ~1 cm left so the equation is visually inset
         ind = OxmlElement("w:ind")
         ind.set(qn("w:left"), "567")   # 1 cm ≈ 567 twips
         pPr.append(ind)
 
-        # Tab stop at 13.5 cm, right-aligned (for eq number)
-        if eq_number:
-            tabs = OxmlElement("w:tabs")
-            tab = OxmlElement("w:tab")
-            tab.set(qn("w:val"), "right")
-            tab.set(qn("w:pos"), "8504")   # 15 cm ≈ 8504 twips
-            tabs.append(tab)
-            pPr.append(tabs)
+        # Right-aligned tab stop at ~15 cm for the equation number
+        tabs = OxmlElement("w:tabs")
+        tab = OxmlElement("w:tab")
+        tab.set(qn("w:val"), "right")
+        tab.set(qn("w:pos"), "8504")   # 15 cm ≈ 8504 twips
+        tabs.append(tab)
+        pPr.append(tabs)
 
         # Insert the OMML <m:oMath> element directly into the <w:p>
-        oMath = _make_omath(equation_text)
-        p._p.append(oMath)
+        p._p.append(_make_omath(equation_text))
 
-        # Append equation number as a plain run after a tab
-        if eq_number:
-            # tab run
-            tab_r = OxmlElement("w:r")
-            tab_t = OxmlElement("w:tab")
-            tab_r.append(tab_t)
-            p._p.append(tab_r)
+        # Tab + number run
+        tab_r = OxmlElement("w:r")
+        tab_t = OxmlElement("w:tab")
+        tab_r.append(tab_t)
+        p._p.append(tab_r)
 
-            # number run
-            num_r = OxmlElement("w:r")
-            rPr = OxmlElement("w:rPr")
-            sz = OxmlElement("w:sz")
-            sz.set(qn("w:val"), "20")   # 10pt
-            rPr.append(sz)
-            color = OxmlElement("w:color")
-            color.set(qn("w:val"), "606060")
-            rPr.append(color)
-            num_r.append(rPr)
-            num_t = OxmlElement("w:t")
-            num_t.text = f"(Eq. {eq_number})"
-            num_r.append(num_t)
-            p._p.append(num_r)
-
-        # Reference line below (Sadraey §X.X)
-        if reference:
-            ref_p = self._doc.add_paragraph(f"    {reference}")
-            if ref_p.runs:
-                ref_p.runs[0].italic = True
-                ref_p.runs[0].font.size = Pt(9)
-                ref_p.runs[0].font.color.rgb = RGBColor(0x60, 0x60, 0x60)
-            ref_p.paragraph_format.left_indent = Cm(1.5)
+        num_r = OxmlElement("w:r")
+        rPr = OxmlElement("w:rPr")
+        sz = OxmlElement("w:sz")
+        sz.set(qn("w:val"), "20")   # 10 pt
+        rPr.append(sz)
+        color = OxmlElement("w:color")
+        color.set(qn("w:val"), "606060")
+        rPr.append(color)
+        num_r.append(rPr)
+        num_t = OxmlElement("w:t")
+        num_t.text = f"({eq_number})"
+        num_r.append(num_t)
+        p._p.append(num_r)
 
     def add_key_value_list(
         self,
         items: list[tuple[str, str]],
         columns: int = 2,
     ) -> None:
-        """Render as a bordered two-column table (label | value)."""
+        """Render as a bordered two-column table (label | value).
+
+        Both label and value support inline ``{{{LaTeX}}}`` math.
+        """
         if not items:
             return
         table = self._doc.add_table(rows=len(items), cols=2)
@@ -309,12 +347,11 @@ class DocxBuilder(ReportBuilder):
         table.alignment = WD_TABLE_ALIGNMENT.LEFT
         for r, (lbl, val) in enumerate(items):
             row = table.rows[r]
-            row.cells[0].text = lbl
-            row.cells[1].text = val
             fill = "F5F5F5" if r % 2 == 0 else "FFFFFF"
             _shade_cell(row.cells[0], fill)
             _shade_cell(row.cells[1], fill)
-            row.cells[0].paragraphs[0].runs[0].bold = True
+            _emit_text_with_math(row.cells[0].paragraphs[0], str(lbl), bold=True)
+            _emit_text_with_math(row.cells[1].paragraphs[0], str(val))
         self._doc.add_paragraph()
 
     def add_bulleted_list(self, items: list[str]) -> None:
@@ -325,10 +362,16 @@ class DocxBuilder(ReportBuilder):
         p = self._doc.add_paragraph()
         p.paragraph_format.left_indent  = Cm(1.0)
         p.paragraph_format.right_indent = Cm(1.0)
-        run = p.add_run(f"Note:  {text}")
-        run.italic = True
-        run.font.size = Pt(10)
-        run.font.color.rgb = RGBColor(0x4A, 0x4A, 0x4A)
+        # "Note:" prefix as a plain text label, then the message (with inline math)
+        label = p.add_run("Note:  ")
+        label.bold = True
+        label.font.size = Pt(10)
+        label.font.color.rgb = RGBColor(0x4A, 0x4A, 0x4A)
+        _emit_text_with_math(p, text, italic=True)
+        # Re-style the emitted runs so the note appears uniformly muted
+        for run in p.runs[1:]:
+            run.font.size = Pt(10)
+            run.font.color.rgb = RGBColor(0x4A, 0x4A, 0x4A)
 
     def add_horizontal_rule(self) -> None:
         p = self._doc.add_paragraph()
