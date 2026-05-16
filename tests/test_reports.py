@@ -227,6 +227,25 @@ class TestExportedDocxStructure:
             "No <m:oMath> elements found — equations are not rendered as Word math"
         )
 
+    def test_omml_has_real_structure_not_just_text(self, exported_doc):
+        """Equations must produce structural OMML — fractions, radicals, sub/sup —
+        not just <m:t> text inside <m:oMath>. Without this, Word renders the
+        equation as plain italic text rather than proper math layout.
+
+        python-docx serializes OMML with the ``m:`` prefix (e.g. ``<m:f>``);
+        match the prefix form rather than the Clark-notation tag.
+        """
+        body_xml = etree.tostring(exported_doc.element).decode("utf-8")
+        # The doc must contain at least one of each: fraction, radical,
+        # subscript, and subscript+superscript (a baseline of math richness).
+        assert "<m:f>" in body_xml or "<m:f " in body_xml, "No <m:f> fractions found"
+        assert "<m:rad>" in body_xml or "<m:rad " in body_xml, "No <m:rad> radicals found"
+        assert "<m:sSub>" in body_xml or "<m:sSub " in body_xml, "No <m:sSub> subscripts found"
+        # sSup is rarer in our equations; sSubSup is the more common combined form
+        assert (
+            "<m:sSup>" in body_xml or "<m:sSubSup>" in body_xml
+        ), "No <m:sSup> / <m:sSubSup> superscripts found"
+
     def test_mission_segments_energy_matches_electric_propulsion(
         self, exported_doc
     ):
@@ -270,23 +289,69 @@ class TestExportedDocxStructure:
 
 
 class TestOMMLBuilder:
+    """Verify the LaTeX→OMML transform produces real Word math structure,
+    not just <m:t> text-runs wrapped in <m:oMath>."""
+
+    def _count(self, el, *local_names):
+        """Count descendants whose local-name is in ``local_names``."""
+        total = 0
+        for d in el.iter():
+            tag = d.tag.split("}", 1)[1] if "}" in d.tag else d.tag
+            if tag in local_names:
+                total += 1
+        return total
+
     def test_make_omath_returns_oMath_element(self):
-        el = _make_omath("a + b = c")
+        el = _make_omath(r"a + b = c")
         assert el.tag == f"{{{_OMML_NS}}}oMath"
 
-    def test_make_omath_roundtrips_through_lxml(self):
-        el = _make_omath("CL* = sqrt(CD0 / k)")
+    def test_fraction_emits_omml_frac(self):
+        el = _make_omath(r"\frac{W_E}{W_{TO}} = a")
+        assert self._count(el, "f") >= 1, (
+            "LaTeX \\frac should produce <m:f> (real fraction structure)"
+        )
+        # Each <m:f> must contain <m:num> and <m:den>
+        assert self._count(el, "num") >= 1
+        assert self._count(el, "den") >= 1
+
+    def test_sqrt_emits_omml_rad(self):
+        el = _make_omath(r"C_L = \sqrt{C_{D_0} / k}")
+        assert self._count(el, "rad") >= 1, (
+            "LaTeX \\sqrt should produce <m:rad> (real radical structure)"
+        )
+
+    def test_subscript_emits_omml_sSub(self):
+        el = _make_omath(r"V_s")
+        assert self._count(el, "sSub") >= 1, (
+            "LaTeX subscript should produce <m:sSub>"
+        )
+
+    def test_superscript_emits_omml_sSup(self):
+        el = _make_omath(r"V^2")
+        assert self._count(el, "sSup") >= 1, (
+            "LaTeX superscript should produce <m:sSup>"
+        )
+
+    def test_sub_and_sup_combined_emits_sSubSup(self):
+        el = _make_omath(r"V_s^2")
+        assert self._count(el, "sSubSup") >= 1, (
+            "LaTeX sub+sup on same base should produce <m:sSubSup>"
+        )
+
+    def test_greek_letters_preserved_in_text(self):
+        el = _make_omath(r"\rho_0 \cdot V")
+        # Find all <m:t> elements and concatenate their text
+        all_text = "".join(
+            (t.text or "")
+            for t in el.iter(f"{{{_OMML_NS}}}t")
+        )
+        assert "ρ" in all_text, "Greek rho missing from OMML output"
+
+    def test_well_formed_xml(self):
+        el = _make_omath(r"\frac{1}{2}\rho_0 V_s^2 C_{L_{\max}}")
         s = etree.tostring(el)
         reparsed = etree.fromstring(s)
         assert reparsed.tag.endswith("}oMath")
-
-    def test_make_omath_preserves_unicode(self):
-        el = _make_omath("½ρ₀V²")
-        # Should contain the literal Unicode glyphs inside <m:t>
-        text_el = el.find(f"{{{_OMML_NS}}}r/{{{_OMML_NS}}}t")
-        assert text_el is not None
-        assert "½" in text_el.text
-        assert "ρ₀" in text_el.text
 
 
 # ── Display-rule tests: only relevant data should appear ────────────────────

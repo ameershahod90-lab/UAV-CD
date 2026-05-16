@@ -28,7 +28,7 @@ class ConstraintEquationsSection(ReportSection):
         # Stall
         rb.add_heading("1. Stall Speed Constraint", level=2)
         rb.add_equation(
-            "(W/S)_Vs = ½ · ρ₀ · Vs² · CLmax",
+            r"(W/S)_{V_s} = \tfrac{1}{2}\,\rho_0\,V_s^{2}\,C_{L_{\max}}",
             eq_number="2.38", reference=ref,
         )
 
@@ -36,30 +36,34 @@ class ConstraintEquationsSection(ReportSection):
         rb.add_heading("2. Maximum Level Speed", level=2)
         if is_jet:
             rb.add_equation(
-                "T/W = q·CD₀/(W/S) + k·(W/S)/q   where q = ½ρ₀σVmax²",
+                r"T/W = \frac{q\,C_{D_0}}{W/S} + \frac{k(W/S)}{q}",
                 eq_number="2.39", reference=ref,
+            )
+            rb.add_paragraph(
+                "where q = ½ρ₀σVmax²", italic=True, indent=True,
             )
         else:
             rb.add_equation(
-                "W/P = ηₚ / [½ρ₀σVmax³·CD₀/(W/S) + 2k·(W/S)/(ρ₀σVmax)]",
+                r"W/P = \frac{\eta_p}{\tfrac{1}{2}\rho_0 \sigma V_{\max}^{3}\,C_{D_0}/(W/S) + 2k(W/S)/(\rho_0 \sigma V_{\max})}",
                 eq_number="2.40", reference=ref,
             )
 
         # Takeoff
         rb.add_heading("3. Takeoff Ground Roll", level=2)
-        rb.add_paragraph(
-            "Where: χ = exp(−0.6ρg·CDG·STO / (W/S))   and   "
-            "CDG = CD₀ − μ·CLR",
-            italic=True, indent=True,
+        rb.add_equation(
+            r"\chi = \exp\!\left(-\frac{0.6\,\rho\,g\,C_{DG}\,S_{TO}}{W/S}\right)",
+        )
+        rb.add_equation(
+            r"C_{DG} = C_{D_0} - \mu\,C_{LR}",
         )
         if is_jet:
             rb.add_equation(
-                "T/W = [μ − (μ + CDG/CLR)·χ] / (1 − χ)",
+                r"T/W = \frac{\mu - (\mu + C_{DG}/C_{LR})\chi}{1 - \chi}",
                 eq_number="2.41", reference=ref,
             )
         else:
             rb.add_equation(
-                "W/P = ηₚ/VTO · (1 − χ) / [μ·(1 − χ) − (CDG/CLR)·χ]",
+                r"W/P = \frac{\eta_p}{V_{TO}} \cdot \frac{1 - \chi}{\mu(1 - \chi) - (C_{DG}/C_{LR})\chi}",
                 eq_number="2.42", reference=ref,
             )
 
@@ -67,38 +71,46 @@ class ConstraintEquationsSection(ReportSection):
         rb.add_heading("4. Rate of Climb", level=2)
         if is_jet:
             rb.add_equation(
-                "T/W = ROC/Vmd + 1/(L/D)max   where Vmd = √(2(W/S)/ρ√(CD₀/k))",
+                r"T/W = \frac{ROC}{V_{md}} + \frac{1}{(L/D)_{\max}}",
                 eq_number="2.43", reference=ref,
+            )
+            rb.add_equation(
+                r"V_{md} = \sqrt{\frac{2(W/S)}{\rho\sqrt{C_{D_0}/k}}}",
             )
         else:
             rb.add_equation(
-                "W/P = 1 / (ROC/ηₚ + Vmp·1.155/((L/D)max·ηₚ))",
+                r"W/P = \frac{1}{ROC/\eta_p + V_{mp}\,(1.155)/((L/D)_{\max}\,\eta_p)}",
                 eq_number="2.44", reference=ref,
             )
-            rb.add_equation("Vmp = √(2(W/S) / (ρ·√(3·CD₀/k)))")
+            rb.add_equation(
+                r"V_{mp} = \sqrt{\frac{2(W/S)}{\rho\sqrt{3\,C_{D_0}/k}}}",
+            )
 
         # Ceiling
         rb.add_heading("5. Service Ceiling", level=2)
         rb.add_paragraph(
-            f"At service ceiling ROC_C = 0.508 m/s (100 ft/min); "
-            f"σ_C = ρ_ceiling / ρ_SL",
+            "At service ceiling ROC_C = 0.508 m/s (100 ft/min); "
+            "σ_C = ρ_ceiling / ρ_SL",
             italic=True, indent=True,
         )
         if is_jet:
             rb.add_equation(
-                "T_SL/W = ROC_C/(σ_C·Vmd_C) + 1/(σ_C·(L/D)max)",
+                r"T_{SL}/W = \frac{ROC_C}{\sigma_C\,V_{md,C}} + \frac{1}{\sigma_C\,(L/D)_{\max}}",
                 eq_number="2.45", reference=ref,
             )
         else:
             rb.add_equation(
-                "W/P_SL = σ_C / (ROC_C/ηₚ + Vmp_C·1.155/((L/D)max·ηₚ))",
+                r"W/P_{SL} = \frac{\sigma_C}{ROC_C/\eta_p + V_{mp,C}\,(1.155)/((L/D)_{\max}\,\eta_p)}",
                 eq_number="2.46", reference=ref,
             )
 
         # Wing and engine sizing
         rb.add_heading("Wing and Engine Sizing", level=2)
-        rb.add_equation("S_ref = W_TO / (W/S)_d",   eq_number="2.49", reference=ref)
+        rb.add_equation(r"S_{ref} = \frac{W_{TO}}{(W/S)_{d}}",
+                        eq_number="2.49", reference=ref)
         if is_jet:
-            rb.add_equation("T = (T/W)_d · W_TO",   eq_number="2.51", reference=ref)
+            rb.add_equation(r"T = (T/W)_{d} \cdot W_{TO}",
+                            eq_number="2.51", reference=ref)
         else:
-            rb.add_equation("P = W_TO / (W/P)_d",   eq_number="2.50", reference=ref)
+            rb.add_equation(r"P = \frac{W_{TO}}{(W/P)_{d}}",
+                            eq_number="2.50", reference=ref)

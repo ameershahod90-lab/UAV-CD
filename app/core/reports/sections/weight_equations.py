@@ -41,7 +41,7 @@ class WeightEquationsSection(ReportSection):
         # ── MTOW convergence loop ─────────────────────────────────────────
         rb.add_heading("1.  MTOW Convergence Identity", level=2)
         rb.add_equation(
-            "W_TO = W_payload / (1 - W_E/W_TO - W_F/W_TO)",
+            r"W_{TO} = \frac{W_{payload}}{1 - W_E/W_{TO} - W_F/W_{TO}}",
             reference=ref,
         )
         rb.add_key_value_list([
@@ -58,7 +58,7 @@ class WeightEquationsSection(ReportSection):
             "fitted to the UAV historical database (Sadraey Table 2.4):"
         )
         rb.add_equation(
-            "W_E / W_TO = a · W_TO^b",
+            r"\frac{W_E}{W_{TO}} = a \cdot W_{TO}^{\,b}",
             reference=ref,
         )
         rb.add_key_value_list([
@@ -68,26 +68,26 @@ class WeightEquationsSection(ReportSection):
         # ── Mission fraction product ──────────────────────────────────────
         rb.add_heading("3.  Mission Weight Fraction", level=2)
         rb.add_equation(
-            "W_final / W_initial = product(Wi/Wi-1) for all enabled segments",
+            r"\frac{W_{final}}{W_{initial}} = \prod_{i} \frac{W_i}{W_{i-1}}",
             reference=ref,
         )
         rb.add_equation(
-            "W_F / W_TO = 1 - W_final / W_initial",
+            r"\frac{W_F}{W_{TO}} = 1 - \frac{W_{final}}{W_{initial}}",
             reference=ref,
         )
 
         # ── Maximum aerodynamic efficiency ────────────────────────────────
         rb.add_heading("4.  Aerodynamic Efficiency", level=2)
         rb.add_equation(
-            "k = 1 / (pi · e · AR)",
+            r"k = \frac{1}{\pi\,e\,AR}",
             reference=ref24,
         )
         rb.add_equation(
-            "CL* = sqrt(CD0 / k)",
+            r"C_L^{*} = \sqrt{\frac{C_{D_0}}{k}}",
             reference=ref24,
         )
         rb.add_equation(
-            "(L/D)max = 1 / (2 · sqrt(CD0 · k))",
+            r"(L/D)_{\max} = \frac{1}{2\sqrt{C_{D_0}\,k}}",
             reference=ref24,
         )
         rb.add_key_value_list([
@@ -124,7 +124,7 @@ class WeightEquationsSection(ReportSection):
             # Fuel-based propulsion
             rb.add_heading("6a.  Cruise Segment — Breguet Range Equation", level=2)
             rb.add_equation(
-                "Wi/Wi-1 = exp( -(R · SFC · g) / (eta_p · V · (L/D)) )",
+                r"\frac{W_i}{W_{i-1}} = \exp\!\left(-\frac{R \cdot SFC \cdot g}{\eta_p \cdot V \cdot (L/D)}\right)",
                 eq_number="2.17",
                 reference=ref,
             )
@@ -139,7 +139,7 @@ class WeightEquationsSection(ReportSection):
 
             rb.add_heading("6b.  Loiter Segment — Breguet Endurance Equation", level=2)
             rb.add_equation(
-                "Wi/Wi-1 = exp( -(E · SFC · g) / (eta_p · (L/D)) )",
+                r"\frac{W_i}{W_{i-1}} = \exp\!\left(-\frac{E \cdot SFC \cdot g}{\eta_p \cdot (L/D)}\right)",
                 eq_number="2.18",
                 reference=ref,
             )
@@ -154,18 +154,18 @@ class WeightEquationsSection(ReportSection):
                 "battery mass calculation based on energy consumption:"
             )
             rb.add_equation(
-                "P_avg = (W_TO · g) / (eta_p · (L/D)) · V",
+                r"P_{avg} = \frac{W_{TO} \cdot g}{\eta_p \cdot (L/D)} \cdot V",
             )
             rb.add_equation(
-                "E_seg = P_avg · t_seg",
+                r"E_{seg} = P_{avg} \cdot t_{seg}",
                 eq_number="2.25",
                 reference=ref27,
             )
             rb.add_equation(
-                "E_total = sum(E_seg) for all enabled segments",
+                r"E_{total} = \sum_{i} E_{seg,i}",
             )
             rb.add_equation(
-                "W_battery = E_total / (eta_bat · e_bat · 3600)",
+                r"W_{battery} = \frac{E_{total}}{\eta_{bat} \cdot e_{bat} \cdot 3600}",
             )
             rb.add_key_value_list([
                 ("P_avg",    "Average power required [W]"),

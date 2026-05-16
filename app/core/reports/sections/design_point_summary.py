@@ -33,23 +33,23 @@ class DesignPointSummarySection(ReportSection):
             rb.add_heading("Sizing Equations", level=2)
             ref = "Sadraey §2.9" if ctx.include_sadraey_refs else ""
             rb.add_equation(
-                "S = W_TO / (W/S)_d",
+                r"S = \frac{W_{TO}}{(W/S)_{d}}",
                 eq_number="2.49",
                 reference=ref,
             )
             if is_power:
                 rb.add_equation(
-                    "P = W_TO / (W/P)_d",
+                    r"P = \frac{W_{TO}}{(W/P)_{d}}",
                     eq_number="2.50",
                     reference=ref,
                 )
             else:
                 rb.add_equation(
-                    "T = (T/W)_d · W_TO",
+                    r"T = (T/W)_{d} \cdot W_{TO}",
                     eq_number="2.51",
                     reference=ref,
                 )
-            rb.add_equation("b = sqrt(AR · S)")
+            rb.add_equation(r"b = \sqrt{AR \cdot S}")
 
             # Variable definitions — show only the loading row that applies
             var_defs: list[tuple[str, str]] = [

@@ -31,6 +31,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from lxml import etree
 
 from app.core.reports.renderer import ReportBuilder, ReportConfig
+from app.core.reports.renderers.latex_omml import latex_to_omml
 
 # Brand colours
 _BLUE   = RGBColor(0x1A, 0x5C, 0x96)   # heading blue
@@ -54,20 +55,17 @@ def _shade_cell(cell, fill_hex: str) -> None:
     tc_pr.append(shd)
 
 
-def _make_omath(equation_text: str) -> etree._Element:
+def _make_omath(equation_src: str) -> etree._Element:
     """
-    Build an OMML <m:oMath> inline element from a Unicode math string.
+    Build a structured OMML ``<m:oMath>`` element from a LaTeX math source.
 
-    When appended to a <w:p> element, Word renders it as a displayed equation
-    object that is fully editable via Word's built-in equation editor.
-    Unicode math characters (₀ ² · etc.) are preserved inside the math run.
+    The input is LaTeX (e.g. ``r"\\frac{W_E}{W_{TO}} = a \\cdot W_{TO}^{b}"``).
+    The output has real OMML structure — ``<m:f>`` for fractions, ``<m:rad>``
+    for square roots, ``<m:sSup>``/``<m:sSub>``/``<m:sSubSup>`` for sub/sup,
+    ``<m:d>`` for delimiters — so Word renders it as a real equation object
+    (click → equation editor opens with proper math layout).
     """
-    oMath = etree.Element(f"{_M}oMath")
-    r = etree.SubElement(oMath, f"{_M}r")
-    # <m:rPr> — no <m:nor> so the text is styled as math (italic by default)
-    t = etree.SubElement(r, f"{_M}t")
-    t.text = equation_text
-    return oMath
+    return latex_to_omml(equation_src)
 
 
 class DocxBuilder(ReportBuilder):
