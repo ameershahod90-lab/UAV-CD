@@ -134,7 +134,12 @@ class TestSectionBuilds:
 
     @pytest.mark.parametrize(
         "propulsion",
-        [PropulsionType.ELECTRIC, PropulsionType.PISTON, PropulsionType.HYBRID],
+        [
+            PropulsionType.ELECTRIC,
+            PropulsionType.PISTON,
+            PropulsionType.HYBRID,
+            PropulsionType.TURBOJET,
+        ],
     )
     def test_every_section_builds(self, store, propulsion):
         store.update_brief_field("propulsion_type", propulsion)
@@ -159,7 +164,12 @@ class TestSectionBuilds:
 class TestEndToEndExport:
     @pytest.mark.parametrize(
         "propulsion",
-        [PropulsionType.ELECTRIC, PropulsionType.PISTON, PropulsionType.HYBRID],
+        [
+            PropulsionType.ELECTRIC,
+            PropulsionType.PISTON,
+            PropulsionType.HYBRID,
+            PropulsionType.TURBOJET,
+        ],
     )
     def test_export_produces_valid_docx(self, store, propulsion, tmp_path):
         store.update_brief_field("propulsion_type", propulsion)
@@ -277,6 +287,88 @@ class TestOMMLBuilder:
         assert text_el is not None
         assert "½" in text_el.text
         assert "ρ₀" in text_el.text
+
+
+# ── Display-rule tests: only relevant data should appear ────────────────────
+
+
+def _doc_text(doc) -> str:
+    """Concatenate all text content (paragraphs + table cells) into one string."""
+    parts = [p.text for p in doc.paragraphs]
+    for tbl in doc.tables:
+        for row in tbl.rows:
+            for cell in row.cells:
+                parts.append(cell.text)
+    return "\n".join(parts)
+
+
+class TestDisplayRules:
+    """Hide irrelevant data per propulsion type (ui_ux.md bible rule)."""
+
+    def _exported(self, store, tmp_path, propulsion):
+        store.update_brief_field("propulsion_type", propulsion)
+        SizingService(store).run_now()
+        out = tmp_path / f"display_{propulsion.name.lower()}.docx"
+        ok, msg = _export(store, out)
+        assert ok, msg
+        return Document(str(out))
+
+    def test_electric_propulsion_hides_thrust_to_weight(self, store, tmp_path):
+        doc = self._exported(store, tmp_path, PropulsionType.ELECTRIC)
+        text = _doc_text(doc)
+        # Electric uses W/P — (T/W) should not appear as a variable definition
+        # or as a sizing-results row label.
+        assert "(T/W)_d" not in text, (
+            "Electric propulsion design-point summary should not mention (T/W)_d"
+        )
+        assert "Thrust-to-Weight Ratio (T/W)" not in text, (
+            "Electric propulsion sizing results should not show Thrust-to-Weight Ratio"
+        )
+
+    def test_turbojet_propulsion_hides_power_loading(self, store, tmp_path):
+        doc = self._exported(store, tmp_path, PropulsionType.TURBOJET)
+        text = _doc_text(doc)
+        # Turbojet uses T/W — (W/P) should not appear as variable def or
+        # as a results-row label.
+        assert "(W/P)_d" not in text, (
+            "Turbojet propulsion design-point summary should not mention (W/P)_d"
+        )
+        assert "Power Loading (W/P)" not in text, (
+            "Turbojet propulsion sizing results should not show Power Loading"
+        )
+
+    def test_no_alternative_notes_column_in_sizing_results(
+        self, sized_store, tmp_path
+    ):
+        out = tmp_path / "no_alt.docx"
+        ok, _ = _export(sized_store, out)
+        assert ok
+        doc = Document(str(out))
+        for tbl in doc.tables:
+            headers = [c.text.strip() for c in tbl.rows[0].cells]
+            assert "Alternative / Notes" not in headers, (
+                f"Sizing Results table still has 'Alternative / Notes' column: {headers}"
+            )
+
+    def test_matching_diagram_wing_loading_no_duplicate_si(
+        self, sized_store, tmp_path
+    ):
+        """Wing loading line should not show '... | <same value> N/m²' suffix."""
+        out = tmp_path / "no_dup.docx"
+        ok, _ = _export(sized_store, out)
+        assert ok
+        doc = Document(str(out))
+        for tbl in doc.tables:
+            for row in tbl.rows:
+                for cell in row.cells:
+                    text = cell.text
+                    if "Wing Loading (W/S)" in text:
+                        # cell with the label only; the value cell is the next one
+                        continue
+                    if "N/m²" in text and "|" in text:
+                        pytest.fail(
+                            f"Duplicate SI value in matching-diagram cell: {text!r}"
+                        )
 
 
 # ── Bonus: include/exclude equations toggle ─────────────────────────────────

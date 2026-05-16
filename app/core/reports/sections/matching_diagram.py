@@ -16,18 +16,22 @@ class MatchingDiagramSection(ReportSection):
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
         rb.add_heading(self.title, level=1)
-        rb.add_paragraph(
-            "The matching diagram maps all performance constraints onto a "
-            "single plot of Wing Loading (W/S) vs Power Loading (W/P) or "
-            "Thrust Loading (T/W).  The feasible design region is bounded by "
-            "the constraint envelope; the design point is selected from within "
-            "this region — ideally at the intersection that maximises W/S and "
-            "W/P to minimise wing area and engine size."
-        )
 
         cr = ctx.constraint_result
         dp = ctx.design_point
         dc = ctx.display_converter
+        is_power = cr.is_power_loading_mode if cr else True
+        loading_axis = "Power Loading (W/P)" if is_power else "Thrust-to-Weight (T/W)"
+        loading_short = "W/P" if is_power else "T/W"
+
+        rb.add_paragraph(
+            f"The matching diagram maps all performance constraints onto a "
+            f"single plot of Wing Loading (W/S) versus {loading_axis}. "
+            f"The feasible design region is bounded by the constraint "
+            f"envelope; the design point is selected from within this region — "
+            f"ideally at the intersection that maximises W/S and {loading_short} "
+            f"to minimise wing area and engine size."
+        )
 
         if ctx.matching_diagram_png:
             rb.add_figure(
@@ -59,15 +63,14 @@ class MatchingDiagramSection(ReportSection):
         if dp is not None:
             rb.add_heading("Selected Design Point Coordinates", level=2)
             ws_v, ws_u = dc.wing_loading(dp.wing_loading_nm2)
-            is_power = cr.is_power_loading_mode if cr else True
             if is_power:
                 ld_v, ld_u = dc.power_loading(dp.power_loading_nw)
+                ld_label = "Power Loading (W/P)"
             else:
                 ld_v, ld_u = dc.force_loading(dp.power_loading_nw)
+                ld_label = "Thrust-to-Weight Ratio (T/W)"
 
             rb.add_key_value_list([
-                ("Wing Loading (W/S)",
-                 f"{ws_v:.1f} {ws_u}  |  {dp.wing_loading_nm2:.1f} N/m²"),
-                ("Loading (W/P or T/W)",
-                 f"{ld_v:.5f} {ld_u}"),
+                ("Wing Loading (W/S)", f"{ws_v:.2f} {ws_u}"),
+                (ld_label,             f"{ld_v:.5f} {ld_u}"),
             ])

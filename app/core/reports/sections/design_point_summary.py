@@ -26,8 +26,9 @@ class DesignPointSummarySection(ReportSection):
 
         cr = ctx.constraint_result
         is_power = cr.is_power_loading_mode if cr else True
+        dc = ctx.display_converter
 
-        # Equations
+        # Equations — only the one relevant to the propulsion loading mode
         if ctx.include_equations:
             rb.add_heading("Sizing Equations", level=2)
             ref = "Sadraey §2.9" if ctx.include_sadraey_refs else ""
@@ -48,56 +49,54 @@ class DesignPointSummarySection(ReportSection):
                     eq_number="2.51",
                     reference=ref,
                 )
-            rb.add_equation(
-                "b = sqrt(AR · S)",
-            )
-            rb.add_key_value_list([
-                ("S",         "Wing reference area [m²]"),
-                ("W_TO",      "Maximum takeoff weight [N] = m_TO · g"),
-                ("(W/S)_d",   "Wing loading at design point [N/m²]"),
-                ("(W/P)_d",   "Power loading at design point [N/W]"),
-                ("(T/W)_d",   "Thrust-to-weight ratio at design point"),
-                ("b",         "Wingspan [m]"),
-                ("AR",        "Wing aspect ratio"),
-            ])
+            rb.add_equation("b = sqrt(AR · S)")
 
-        # Results table
+            # Variable definitions — show only the loading row that applies
+            var_defs: list[tuple[str, str]] = [
+                ("S",       "Wing reference area"),
+                ("W_TO",    "Maximum takeoff weight (= m_TO · g)"),
+                ("(W/S)_d", "Wing loading at design point"),
+            ]
+            if is_power:
+                var_defs.append(("(W/P)_d", "Power loading at design point"))
+            else:
+                var_defs.append(("(T/W)_d", "Thrust-to-weight ratio at design point"))
+            var_defs.extend([
+                ("b",  "Wingspan"),
+                ("AR", "Wing aspect ratio"),
+            ])
+            rb.add_key_value_list(var_defs)
+
+        # Results table — values in user's display units; no SI / alternative column
         rb.add_heading("Sizing Results", level=2)
 
-        g = 9.81
-        ws  = dp.wing_loading_nm2
-        wto = dp.w_to_kg
-        s   = dp.wing_area_m2
-        b   = dp.wingspan_m
-        ar  = dp.aspect_ratio
-        pwr = dp.engine_power_w
-        wp  = dp.power_loading_nw
+        wto_v, wto_u = dc.mass(dp.w_to_kg)
+        ws_v,  ws_u  = dc.wing_loading(dp.wing_loading_nm2)
+        s_v,   s_u   = dc.area(dp.wing_area_m2)
+        b_v,   b_u   = dc.length(dp.wingspan_m)
+
+        if is_power:
+            ld_v, ld_u = dc.power_loading(dp.power_loading_nw)
+            ld_label   = "Power Loading (W/P)"
+            pwr_v, pwr_u = dc.power(dp.engine_power_w)
+            pwr_label  = "Required Engine Power"
+        else:
+            ld_v, ld_u = dc.force_loading(dp.power_loading_nw)
+            ld_label   = "Thrust-to-Weight Ratio (T/W)"
+            pwr_v, pwr_u = dc.force(dp.engine_power_w)
+            pwr_label  = "Required Engine Thrust"
 
         rows = [
-            ["Max Takeoff Weight (MTOW)",
-             f"{wto:.3f} kg",
-             f"{wto * g:.1f} N"],
-            ["Wing Loading (W/S)_d",
-             f"{ws:.1f} N/m²",
-             f"{ws / g:.2f} kg/m²"],
-            ["Power/Thrust Loading",
-             f"{wp:.6f}",
-             "N/W (power) or N/N (thrust)"],
-            ["Wing Reference Area S",
-             f"{s:.4f} m²",
-             "—"],
-            ["Wingspan b",
-             f"{b:.3f} m",
-             "—"],
-            ["Aspect Ratio AR",
-             f"{ar:.2f}",
-             "—"],
-            ["Required Engine Power/Thrust",
-             f"{pwr:.1f} W" if is_power else f"{pwr:.1f} N",
-             f"{pwr/1000:.3f} kW" if is_power else "—"],
+            ["Max Takeoff Weight (MTOW)", f"{wto_v:.3f} {wto_u}"],
+            ["Wing Loading (W/S)",        f"{ws_v:.2f} {ws_u}"],
+            [ld_label,                    f"{ld_v:.5f} {ld_u}"],
+            ["Wing Reference Area (S)",   f"{s_v:.4f} {s_u}"],
+            ["Wingspan (b)",              f"{b_v:.3f} {b_u}"],
+            ["Aspect Ratio (AR)",         f"{dp.aspect_ratio:.2f}"],
+            [pwr_label,                   f"{pwr_v:.2f} {pwr_u}"],
         ]
         rb.add_table(
-            headers=["Parameter", "Value (SI)", "Alternative / Notes"],
+            headers=["Parameter", "Value"],
             rows=rows,
             caption="Primary Phase 1 sizing outputs",
         )
