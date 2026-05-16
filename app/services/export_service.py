@@ -29,6 +29,7 @@ from app.core.entities import (
     WeightResult,
     RegressionCoeffs,
 )
+from app.core.enums import PropulsionType
 from app.core.reports.base import ReportContext, SectionRegistry, SectionEntry
 from app.core.reports.renderer import ExportFormat, ReportConfig
 from app.core.reports.renderers.docx_renderer import DocxBuilder
@@ -107,7 +108,9 @@ class ExportService:
                 return None
 
         # Also generate weight pie chart as bytes in-process
-        weight_pie = self._render_weight_pie(sizing.weight_result) or grab("weight_pie_chart")
+        weight_pie = self._render_weight_pie(
+            sizing.weight_result, sizing.brief.propulsion_type
+        ) or grab("weight_pie_chart")
 
         return ReportContext(
             project_name=state.meta.name or "Unnamed Project",
@@ -131,8 +134,17 @@ class ExportService:
             include_sadraey_refs=config.include_sadraey_refs,
         )
 
-    def _render_weight_pie(self, wr: Optional[WeightResult]) -> Optional[bytes]:
-        """Generate a simple weight pie chart as PNG bytes using matplotlib."""
+    def _render_weight_pie(
+        self,
+        wr: Optional[WeightResult],
+        propulsion: PropulsionType,
+    ) -> Optional[bytes]:
+        """Generate a simple weight pie chart as PNG bytes using matplotlib.
+
+        WeightResult stores a single combined ``w_fuel_or_battery_kg`` field;
+        we label the slice based on propulsion (Battery for electric, Fuel for
+        fuel-based, Fuel/Battery for hybrid).
+        """
         if wr is None:
             return None
         try:
@@ -140,19 +152,22 @@ class ExportService:
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
+            if propulsion.is_electric and not propulsion.uses_fuel:
+                energy_label, energy_color = "Battery", "#9b59b6"
+            elif propulsion.uses_fuel and not propulsion.is_electric:
+                energy_label, energy_color = "Fuel", "#e67e22"
+            else:  # HYBRID — combined fuel+battery
+                energy_label, energy_color = "Fuel + Battery", "#e67e22"
+
             labels, sizes, colors = [], [], []
             if wr.w_payload_kg > 0:
                 labels.append(f"Payload\n{wr.w_payload_kg:.2f} kg")
                 sizes.append(wr.w_payload_kg)
                 colors.append("#3498db")
-            if wr.w_fuel_kg > 0:
-                labels.append(f"Fuel\n{wr.w_fuel_kg:.2f} kg")
-                sizes.append(wr.w_fuel_kg)
-                colors.append("#e67e22")
-            if wr.w_battery_kg > 0:
-                labels.append(f"Battery\n{wr.w_battery_kg:.2f} kg")
-                sizes.append(wr.w_battery_kg)
-                colors.append("#9b59b6")
+            if wr.w_fuel_or_battery_kg > 0:
+                labels.append(f"{energy_label}\n{wr.w_fuel_or_battery_kg:.2f} kg")
+                sizes.append(wr.w_fuel_or_battery_kg)
+                colors.append(energy_color)
             if wr.w_empty_kg > 0:
                 labels.append(f"Empty\n{wr.w_empty_kg:.2f} kg")
                 sizes.append(wr.w_empty_kg)

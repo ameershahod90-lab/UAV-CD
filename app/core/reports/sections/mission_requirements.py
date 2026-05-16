@@ -55,17 +55,20 @@ class MissionRequirementsSection(ReportSection):
             caption="Mission design requirements and aerodynamic parameters",
         )
 
-        # Mission segments
+        # Mission segments. The energy_source on each segment defaults to FUEL;
+        # the engine resolves it per-propulsion via with_energy_source(). We do
+        # the same here so the report mirrors what the weight engine actually uses.
         rb.add_heading("Mission Segments", level=2)
         seg_rows = []
         for i, seg in enumerate(b.mission_segments, 1):
-            kind   = seg.segment_type.name
-            enabled = "Yes" if seg.enabled else "No"
-            energy = seg.energy_source.value if hasattr(seg, "energy_source") else "—"
-            if isinstance(seg, CruiseMissionSegment):
-                params = f"Range: {seg.range_km:.1f} km"
-            elif isinstance(seg, LoiterMissionSegment):
-                params = f"Endurance: {seg.endurance_hr:.2f} hr"
+            normalised = seg.with_energy_source(b.propulsion_type)
+            kind = normalised.segment_type.name
+            enabled = "Yes" if normalised.enabled else "No"
+            energy = normalised.energy_source.value
+            if isinstance(normalised, CruiseMissionSegment):
+                params = f"Range: {normalised.range_km:.1f} km"
+            elif isinstance(normalised, LoiterMissionSegment):
+                params = f"Endurance: {normalised.endurance_hr:.2f} hr"
             else:
                 params = "Fixed fraction"
             seg_rows.append([str(i), kind, enabled, energy, params])
