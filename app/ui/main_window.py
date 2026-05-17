@@ -215,75 +215,13 @@ class MainWindow(QMainWindow):
     # ── Export ───────────────────────────────────────────────────────────
 
     def _export_report(self) -> None:
-        """Open the Export Report dialog, passing live-widget figure grabbers."""
-        from PyQt6.QtCore import QBuffer, QIODeviceBase, QSize
-        from PyQt6.QtGui import QPixmap
-        from PyQt6.QtWidgets import QApplication
+        """Open the Export Report dialog.
 
-        def _grab_widget(widget: QWidget) -> bytes:
-            """Capture a widget's content as PNG bytes.
-
-            Prefers pyqtgraph's ``ImageExporter`` for plot widgets — it renders
-            from the underlying QGraphicsScene directly and works even when
-            the widget's parent tab was never shown. Falls back to
-            ``widget.render()`` for non-plot widgets, after forcing a layout
-            cycle so an unrealised widget still has valid geometry.
-            """
-            # If this is (or contains) a pyqtgraph PlotWidget, render its
-            # PlotItem via ImageExporter. The grabbers pass either the
-            # PlotWidget itself (constraints tab) or a wrapping QWidget that
-            # exposes the plot as `._plot` (MissionDiagram).
-            plot_item = None
-            if hasattr(widget, "plotItem"):
-                plot_item = widget.plotItem
-            elif hasattr(widget, "_plot") and hasattr(widget._plot, "plotItem"):
-                plot_item = widget._plot.plotItem
-
-            if plot_item is not None:
-                from pyqtgraph.exporters import ImageExporter
-                import os
-                import tempfile
-
-                exporter = ImageExporter(plot_item)
-                exporter.parameters()["width"] = 1400
-                with tempfile.NamedTemporaryFile(
-                    suffix=".png", delete=False
-                ) as tmp:
-                    tmp_path = tmp.name
-                try:
-                    exporter.export(tmp_path)
-                    with open(tmp_path, "rb") as f:
-                        return f.read()
-                finally:
-                    try:
-                        os.unlink(tmp_path)
-                    except OSError:
-                        pass
-
-            # Generic widget fallback — force layout, then QWidget.render() into
-            # a sized pixmap. Note: PyQt6's render() signature accepts QRegion
-            # (not QRect) as the third argument; we omit it so the default
-            # "whole widget" region applies.
-            widget.adjustSize()
-            QApplication.processEvents()
-
-            size = widget.size()
-            if size.isEmpty():
-                size = QSize(960, 540)
-            pixmap = QPixmap(size)
-            pixmap.fill(Qt.GlobalColor.white)
-            widget.render(pixmap)
-
-            qbuf = QBuffer()
-            qbuf.open(QIODeviceBase.OpenModeFlag.WriteOnly)
-            pixmap.save(qbuf, "PNG")
-            return bytes(qbuf.data())
-
-        grabbers = {
-            "matching_diagram": lambda: _grab_widget(self._constraints_tab._plot),
-            "mission_profile":  lambda: _grab_widget(self._mission_tab._diagram),
-        }
-        dlg = ExportDialog(self._store, grabbers, parent=self)
+        Figures are rendered server-side via matplotlib (see
+        ``app/services/figure_renderers.py``) — the export is independent
+        of which tab is currently visible or even realised.
+        """
+        dlg = ExportDialog(self._store, parent=self)
         dlg.exec()
 
     # ── Helpers ───────────────────────────────────────────────────────────

@@ -4,35 +4,36 @@ Export Service — UAV-CD-APP
 Orchestrates report export:
 
   1. Builds a ReportContext snapshot from AppStore
-  2. Captures figure PNGs from live pyqtgraph widgets
-  3. Instantiates the appropriate ReportBuilder (DocxBuilder or future PdfBuilder)
+  2. Renders figures server-side via matplotlib (no Qt grab needed)
+  3. Instantiates the appropriate ReportBuilder (DocxBuilder, future PdfBuilder)
   4. Iterates enabled sections in order and calls section.build(ctx, rb)
   5. Saves the file
 
 Layer: services/ — imports from core/ and state/, NOT from ui/ widgets directly.
-Figure capture is done by passing widget grabbers as callables, keeping ui/ decoupled.
+
+Figures are rendered server-side using ``app/services/figure_renderers.py``,
+which consumes the same plot-data builders in ``app/core/plots/`` that the
+live Qt UI uses. This decouples the export pipeline from Qt rendering state
+(visibility, layout, theme) entirely — previous widget-grab approaches kept
+producing empty / mis-scaled figures depending on which tab was active.
 """
 
 from __future__ import annotations
 
 import logging
-import math
-import io
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Callable, Optional
 
 from app.core.display_converter import DisplayConverter
-from app.core.entities import (
-    ConstraintResult,
-    DesignPoint,
-    WeightResult,
-    RegressionCoeffs,
-)
-from app.core.enums import PropulsionType
+from app.core.entities import RegressionCoeffs  # noqa: F401 (kept for legacy callers)
 from app.core.reports.base import ReportContext, SectionRegistry, SectionEntry
 from app.core.reports.renderer import ExportFormat, ReportConfig
 from app.core.reports.renderers.docx_renderer import DocxBuilder
+from app.services.figure_renderers import (
+    render_matching_diagram_png,
+    render_mission_profile_png,
+    render_weight_pie_png,
+)
 
 # Triggers auto-registration of all section classes
 import app.core.reports.sections  # noqa: F401
@@ -43,19 +44,17 @@ _LOG = logging.getLogger(__name__)
 
 
 class ExportService:
-    """
-    Report Export Service.
+    """Report Export Service.
 
-    Usage:
+    All figures (matching diagram, mission profile, weight pie chart) are
+    rendered server-side via matplotlib (see ``figure_renderers``). The
+    optional ``figure_grabbers`` parameter on ``export()`` is kept for
+    backward compatibility but is no longer used by the default pipeline.
+
+    Usage::
+
         service = ExportService(store)
-        ok, msg = service.export(config, figure_grabbers)
-
-    figure_grabbers:
-        dict[str, Callable[[], bytes]] mapping figure keys to callables
-        that return PNG bytes captured from live UI widgets.
-        Keys: "matching_diagram", "mission_profile", "weight_pie_chart"
-        Callables are provided by the ExportDialog — keeps services/
-        decoupled from specific widget classes.
+        ok, msg = service.export(config)
     """
 
     def __init__(self, store: AppStore) -> None:
@@ -66,17 +65,18 @@ class ExportService:
         config: ReportConfig,
         figure_grabbers: Optional[dict[str, Callable[[], bytes]]] = None,
     ) -> tuple[bool, str]:
-        """
-        Run the full export pipeline.
+        """Run the full export pipeline.
 
-        Returns (success, message) — message describes error on failure
-        or the output path on success.
+        ``figure_grabbers`` is accepted but ignored — figures are now
+        rendered server-side. Returns ``(success, message)`` where the
+        message describes the error on failure or the output path on
+        success.
         """
         if not config.output_path:
             return False, "No output path specified."
 
         try:
-            ctx = self._build_context(config, figure_grabbers or {})
+            ctx = self._build_context(config)
             rb  = self._build_renderer(config)
             self._render_sections(config, ctx, rb)
             rb.save(config.output_path)
@@ -88,29 +88,21 @@ class ExportService:
 
     # ── Context builder ───────────────────────────────────────────────────
 
-    def _build_context(
-        self,
-        config: ReportConfig,
-        figure_grabbers: dict[str, Callable[[], bytes]],
-    ) -> ReportContext:
+    def _build_context(self, config: ReportConfig) -> ReportContext:
         state    = self._store.state
         settings = self._store.settings
         sizing   = state.sizing
+        dc       = DisplayConverter(settings)
 
-        def grab(key: str) -> Optional[bytes]:
-            fn = figure_grabbers.get(key)
-            if fn is None:
-                return None
-            try:
-                return fn()
-            except Exception as exc:
-                _LOG.warning("Figure grab '%s' failed: %s", key, exc)
-                return None
-
-        # Also generate weight pie chart as bytes in-process
-        weight_pie = self._render_weight_pie(
-            sizing.weight_result, sizing.brief.propulsion_type
-        ) or grab("weight_pie_chart")
+        # All three figures are rendered server-side via matplotlib using
+        # the shared plot-data builders in app/core/plots/.
+        matching_png = render_matching_diagram_png(
+            sizing.constraint_result, sizing.design_point, dc,
+        )
+        mission_png = render_mission_profile_png(sizing.brief)
+        weight_pie  = render_weight_pie_png(
+            sizing.weight_result, sizing.brief.propulsion_type,
+        )
 
         return ReportContext(
             project_name=state.meta.name or "Unnamed Project",
@@ -126,73 +118,13 @@ class ExportService:
             regression_coeffs=state.historical_data.regression_coefficients.get(
                 sizing.brief.propulsion_type.name.lower()
             ) if state.historical_data.regression_coefficients else None,
-            matching_diagram_png=grab("matching_diagram"),
-            mission_profile_png=grab("mission_profile"),
+            matching_diagram_png=matching_png,
+            mission_profile_png=mission_png,
             weight_pie_chart_png=weight_pie,
-            display_converter=DisplayConverter(settings),
+            display_converter=dc,
             include_equations=config.include_equations,
             include_sadraey_refs=config.include_sadraey_refs,
         )
-
-    def _render_weight_pie(
-        self,
-        wr: Optional[WeightResult],
-        propulsion: PropulsionType,
-    ) -> Optional[bytes]:
-        """Generate a simple weight pie chart as PNG bytes using matplotlib.
-
-        WeightResult stores a single combined ``w_fuel_or_battery_kg`` field;
-        we label the slice based on propulsion (Battery for electric, Fuel for
-        fuel-based, Fuel/Battery for hybrid).
-        """
-        if wr is None:
-            return None
-        try:
-            import matplotlib
-            matplotlib.use("Agg")
-            import matplotlib.pyplot as plt
-
-            if propulsion.is_electric and not propulsion.uses_fuel:
-                energy_label, energy_color = "Battery", "#9b59b6"
-            elif propulsion.uses_fuel and not propulsion.is_electric:
-                energy_label, energy_color = "Fuel", "#e67e22"
-            else:  # HYBRID — combined fuel+battery
-                energy_label, energy_color = "Fuel + Battery", "#e67e22"
-
-            labels, sizes, colors = [], [], []
-            if wr.w_payload_kg > 0:
-                labels.append(f"Payload\n{wr.w_payload_kg:.2f} kg")
-                sizes.append(wr.w_payload_kg)
-                colors.append("#3498db")
-            if wr.w_fuel_or_battery_kg > 0:
-                labels.append(f"{energy_label}\n{wr.w_fuel_or_battery_kg:.2f} kg")
-                sizes.append(wr.w_fuel_or_battery_kg)
-                colors.append(energy_color)
-            if wr.w_empty_kg > 0:
-                labels.append(f"Empty\n{wr.w_empty_kg:.2f} kg")
-                sizes.append(wr.w_empty_kg)
-                colors.append("#2ecc71")
-
-            if not sizes:
-                return None
-
-            fig, ax = plt.subplots(figsize=(6, 4))
-            ax.pie(sizes, labels=labels, colors=colors, autopct="%1.1f%%",
-                   startangle=90, pctdistance=0.8)
-            ax.set_title(f"MTOW = {wr.w_to_kg:.3f} kg", fontsize=12)
-            fig.tight_layout()
-
-            buf = io.BytesIO()
-            fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
-            plt.close(fig)
-            buf.seek(0)
-            return buf.read()
-        except ImportError:
-            _LOG.warning("matplotlib not available — weight pie chart skipped")
-            return None
-        except Exception as exc:
-            _LOG.warning("Weight pie chart render failed: %s", exc)
-            return None
 
     # ── Renderer factory ──────────────────────────────────────────────────
 

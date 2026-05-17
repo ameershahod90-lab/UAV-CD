@@ -416,12 +416,7 @@ class MissionTab(QWidget):
     # ── Diagram refresh ───────────────────────────────────────────────────
 
     def _refresh_diagram(self) -> None:
-        brief = self._store.state.sizing.brief
-        self._diagram.update_segments(
-            brief.mission_segments,
-            cruise_altitude_m=brief.cruise_altitude_m,
-            takeoff_run_m=brief.takeoff_run_m,
-        )
+        self._diagram.update_from_brief(self._store.state.sizing.brief)
 
     # ── Validation ────────────────────────────────────────────────────────
 

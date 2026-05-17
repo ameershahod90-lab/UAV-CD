@@ -67,15 +67,13 @@ class _ExportWorker(QObject):
         self,
         service: ExportService,
         config: ReportConfig,
-        figure_grabbers: dict[str, Callable[[], bytes]],
     ) -> None:
         super().__init__()
-        self._service  = service
-        self._config   = config
-        self._grabbers = figure_grabbers
+        self._service = service
+        self._config  = config
 
     def run(self) -> None:
-        ok, msg = self._service.export(self._config, self._grabbers)
+        ok, msg = self._service.export(self._config)
         self.finished.emit(ok, msg)
 
 
@@ -136,13 +134,12 @@ class _SectionRow(QWidget):
 # ===========================================================================
 
 class ExportDialog(QDialog):
-    """
-    Modal dialog for configuring and triggering report export.
+    """Modal dialog for configuring and triggering report export.
 
-    figure_grabbers: dict[str, Callable[[], bytes]]
-        Callables that capture PNG bytes from live UI widgets.
-        Provided by the caller (main_window) to keep this dialog decoupled
-        from specific widget classes.
+    Figures (matching diagram, mission profile, weight pie chart) are
+    rendered server-side by ``app/services/figure_renderers.py`` — no
+    widget-grab callables are passed in. The ``figure_grabbers`` keyword
+    argument is retained for backward compatibility but is unused.
     """
 
     def __init__(
@@ -153,7 +150,6 @@ class ExportDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._store    = store
-        self._grabbers = figure_grabbers or {}
         self._service  = ExportService(store)
         self._entries: list[SectionEntry] = SectionRegistry.default_manifest()
         self._thread: Optional[QThread]   = None
@@ -358,7 +354,7 @@ class ExportDialog(QDialog):
 
         # Run in background thread
         self._thread  = QThread()
-        self._worker  = _ExportWorker(self._service, config, self._grabbers)
+        self._worker  = _ExportWorker(self._service, config)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.finished.connect(self._on_done)

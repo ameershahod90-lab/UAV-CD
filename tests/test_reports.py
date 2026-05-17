@@ -354,6 +354,136 @@ class TestOMMLBuilder:
         assert reparsed.tag.endswith("}oMath")
 
 
+# ── Server-side figure renderers & shared plot-data builders ────────────────
+
+
+class TestPlotDataBuilders:
+    """The core/plots/ data builders are pure-Python and Qt-free; they feed
+    both the live UI plots and the matplotlib export renderers."""
+
+    def test_mission_profile_data_default_brief(self, sized_store):
+        from app.core.plots import build_mission_profile_data
+        data = build_mission_profile_data(sized_store.state.sizing.brief)
+        # Default brief has 6 segments, all enabled
+        assert len(data.segments) == 6
+        assert all(seg.enabled for seg in data.segments)
+        # Cruise altitude must propagate through unchanged
+        assert data.cruise_alt == pytest.approx(
+            sized_store.state.sizing.brief.cruise_altitude_m
+        )
+        # x_max should be strictly positive (mission has length)
+        assert data.x_max > 0
+
+    def test_mission_profile_segment_colours_match_propulsion(self, store):
+        from app.core.enums import PropulsionType
+        from app.core.plots import build_mission_profile_data
+        from app.core.plots.mission_profile import (
+            COLOUR_BATTERY, COLOUR_FUEL, COLOUR_FIXED,
+        )
+
+        # Electric → dynamic segments (cruise/loiter) carry the battery colour
+        store.update_brief_field("propulsion_type", PropulsionType.ELECTRIC)
+        SizingService(store).run_now()
+        data = build_mission_profile_data(store.state.sizing.brief)
+        # Find cruise/loiter (dynamic, enabled) segments and check colour
+        dyn_colours = {seg.color for seg in data.segments
+                       if "Cruise" in seg.label or "Loiter" in seg.label}
+        assert dyn_colours <= {COLOUR_BATTERY}, (
+            f"Electric dynamic segments should be battery-colour; got {dyn_colours}"
+        )
+
+        # Piston → fuel colour for dynamic segments
+        store.update_brief_field("propulsion_type", PropulsionType.PISTON)
+        SizingService(store).run_now()
+        data2 = build_mission_profile_data(store.state.sizing.brief)
+        dyn_colours_2 = {seg.color for seg in data2.segments
+                         if "Cruise" in seg.label or "Loiter" in seg.label}
+        assert dyn_colours_2 <= {COLOUR_FUEL}
+
+    def test_matching_plot_data_default(self, sized_store):
+        from app.core.display_converter import DisplayConverter
+        from app.core.plots import build_matching_plot_data
+
+        s = sized_store.state.sizing
+        dc = DisplayConverter(sized_store.settings)
+        data = build_matching_plot_data(s.constraint_result, s.design_point, dc)
+
+        # Four constraint curves (Max Speed, Takeoff Run, Rate of Climb,
+        # Service Ceiling) plus a stall vertical line drawn separately
+        assert len(data.curves) == 4
+        # Y-clip should sit comfortably above the design-point loading
+        assert data.y_top > 0
+        # Design point must be present and inside the visible range
+        assert data.design_point is not None
+        dp_x, dp_y = data.design_point
+        assert dp_y <= data.y_top, (
+            f"Design point y={dp_y} above y_top={data.y_top} — would be off-plot"
+        )
+
+
+class TestServerSideFigureRenderers:
+    """Matplotlib renderers must produce non-empty PNGs and round-trip via
+    Pillow without errors."""
+
+    def _pil_open(self, png_bytes: bytes):
+        import io as _io
+        try:
+            from PIL import Image
+        except ImportError:
+            pytest.skip("Pillow not installed; skipping image-decoding test")
+        return Image.open(_io.BytesIO(png_bytes))
+
+    def test_mission_profile_png_renders(self, sized_store):
+        from app.services.figure_renderers import render_mission_profile_png
+        png = render_mission_profile_png(sized_store.state.sizing.brief)
+        assert png is not None and len(png) > 2000
+        img = self._pil_open(png)
+        # Image must be a sensible size (matplotlib default at 150 dpi)
+        assert img.width >= 600 and img.height >= 200
+
+    def test_matching_diagram_png_renders(self, sized_store):
+        from app.core.display_converter import DisplayConverter
+        from app.services.figure_renderers import render_matching_diagram_png
+        s = sized_store.state.sizing
+        png = render_matching_diagram_png(
+            s.constraint_result, s.design_point,
+            DisplayConverter(sized_store.settings),
+        )
+        assert png is not None and len(png) > 5000
+        img = self._pil_open(png)
+        assert img.width >= 800 and img.height >= 400
+
+    def test_weight_pie_png_renders_for_each_propulsion(self, store):
+        from app.core.enums import PropulsionType
+        from app.services.figure_renderers import render_weight_pie_png
+        for prop in (
+            PropulsionType.ELECTRIC,
+            PropulsionType.PISTON,
+            PropulsionType.HYBRID,
+        ):
+            store.update_brief_field("propulsion_type", prop)
+            SizingService(store).run_now()
+            png = render_weight_pie_png(
+                store.state.sizing.weight_result, prop,
+            )
+            assert png is not None and len(png) > 2000, (
+                f"Pie chart for {prop.name} is missing or too small"
+            )
+
+    def test_export_embeds_all_three_figures(self, sized_store, tmp_path):
+        """End-to-end: the exported .docx now contains 3 inline shapes —
+        matching diagram, mission profile, and weight pie chart."""
+        out = tmp_path / "with_figures.docx"
+        ok, msg = _export(sized_store, out)
+        assert ok, msg
+        doc = Document(str(out))
+        # Each figure becomes one inline shape
+        assert len(doc.inline_shapes) == 3, (
+            f"Expected 3 figures (matching, mission, pie); "
+            f"found {len(doc.inline_shapes)}"
+        )
+
+
 # ── Auto-numbering, inline math, and citation style ────────────────────────
 
 
