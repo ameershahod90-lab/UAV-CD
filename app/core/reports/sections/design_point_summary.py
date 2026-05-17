@@ -16,7 +16,7 @@ class DesignPointSummarySection(ReportSection):
         intro = (
             "From the selected design point on the matching diagram, the "
             "fundamental aircraft sizing quantities — wing reference area "
-            "{{{S}}}, wingspan {{{b}}}, and required engine power or thrust "
+            "$${S}$$, wingspan $${b}$$, and required engine power or thrust "
             "— are derived using the following relationships"
         )
         if ctx.include_sadraey_refs:

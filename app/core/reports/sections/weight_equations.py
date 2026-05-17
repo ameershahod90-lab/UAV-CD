@@ -30,7 +30,7 @@ class WeightEquationsSection(ReportSection):
 
         intro = (
             "The weight estimation follows the mission-fraction method. The "
-            "MTOW {{{W_{TO}}}} is found by iterating on the identity below "
+            "MTOW $${W_{TO}}$$ is found by iterating on the identity below "
             "until two successive estimates agree to within 0.1 g"
         )
         if ctx.include_sadraey_refs:
@@ -51,10 +51,10 @@ class WeightEquationsSection(ReportSection):
             r"W_{TO} = \frac{W_{payload}}{1 - W_E/W_{TO} - W_F/W_{TO}}"
         )
         rb.add_key_value_list([
-            ("{{{W_{TO}}}}",       "Maximum takeoff weight [kg]"),
-            ("{{{W_{payload}}}}",  "Payload mass [kg]"),
-            ("{{{W_E / W_{TO}}}}", "Empty-weight fraction (from historical regression)"),
-            ("{{{W_F / W_{TO}}}}", "Fuel or battery fraction (from mission fractions)"),
+            ("$${W_{TO}}$$",       "Maximum takeoff weight [kg]"),
+            ("$${W_{payload}}$$",  "Payload mass [kg]"),
+            ("$${W_E / W_{TO}}$$", "Empty-weight fraction (from historical regression)"),
+            ("$${W_F / W_{TO}}$$", "Fuel or battery fraction (from mission fractions)"),
         ])
 
         # ── Empty weight fraction ─────────────────────────────────────────
@@ -65,7 +65,7 @@ class WeightEquationsSection(ReportSection):
         )
         rb.add_equation(r"\frac{W_E}{W_{TO}} = a \cdot W_{TO}^{\,b}")
         rb.add_key_value_list([
-            ("{{{a, b}}}", "Regression coefficients (propulsion-class specific)"),
+            ("$${a, b}$$", "Regression coefficients (propulsion-class specific)"),
         ])
 
         # ── Mission fraction product ──────────────────────────────────────
@@ -83,11 +83,11 @@ class WeightEquationsSection(ReportSection):
         rb.add_equation(r"C_L^{*} = \sqrt{\frac{C_{D_0}}{k}}")
         rb.add_equation(r"(L/D)_{\max} = \frac{1}{2\sqrt{C_{D_0}\,k}}")
         rb.add_key_value_list([
-            ("{{{C_{D_0}}}}",      "Zero-lift (parasitic) drag coefficient"),
-            ("{{{k}}}",            "Induced drag factor"),
-            ("{{{e}}}",            "Oswald span efficiency factor"),
-            ("{{{AR}}}",           "Wing aspect ratio"),
-            ("{{{C_L^{*}}}}",      "Lift coefficient at maximum L/D (best-glide speed)"),
+            ("$${C_{D_0}}$$",      "Zero-lift (parasitic) drag coefficient"),
+            ("$${k}$$",            "Induced drag factor"),
+            ("$${e}$$",            "Oswald span efficiency factor"),
+            ("$${AR}$$",           "Wing aspect ratio"),
+            ("$${C_L^{*}}$$",      "Lift coefficient at maximum L/D (best-glide speed)"),
         ])
 
         # ── Fixed segments ────────────────────────────────────────────────
@@ -97,7 +97,7 @@ class WeightEquationsSection(ReportSection):
             "tabulated fractions (Sadraey Table 2.4). Representative values:"
         )
         rb.add_table(
-            headers=["Segment", "Typical {{{W_i/W_{i-1}}}}"],
+            headers=["Segment", "Typical $${W_i/W_{i-1}}$$"],
             rows=[
                 ["Engine start / warm-up", "0.990"],
                 ["Taxi",                   "0.990"],
@@ -119,12 +119,12 @@ class WeightEquationsSection(ReportSection):
                 r"\frac{W_i}{W_{i-1}} = \exp\!\left(-\frac{R \cdot SFC \cdot g}{\eta_p \cdot V \cdot (L/D)}\right)"
             )
             rb.add_key_value_list([
-                ("{{{R}}}",      "Cruise range [m]"),
-                ("{{{SFC}}}",    "Specific fuel consumption [kg/(N·s)]"),
-                ("{{{g}}}",      "Gravitational acceleration [9.81 m/s²]"),
-                ("{{{\\eta_p}}}", "Propulsive efficiency (prop) or 1.0 (jet)"),
-                ("{{{V}}}",      "Cruise airspeed [m/s]"),
-                ("{{{L/D}}}",    "Lift-to-drag ratio at cruise"),
+                ("$${R}$$",      "Cruise range [m]"),
+                ("$${SFC}$$",    "Specific fuel consumption [kg/(N·s)]"),
+                ("$${g}$$",      "Gravitational acceleration [9.81 m/s²]"),
+                ("$${\\eta_p}$$", "Propulsive efficiency (prop) or 1.0 (jet)"),
+                ("$${V}$$",      "Cruise airspeed [m/s]"),
+                ("$${L/D}$$",    "Lift-to-drag ratio at cruise"),
             ])
 
             rb.add_heading("6b.  Loiter Segment — Breguet Endurance Equation", level=2)
@@ -132,7 +132,7 @@ class WeightEquationsSection(ReportSection):
                 r"\frac{W_i}{W_{i-1}} = \exp\!\left(-\frac{E \cdot SFC \cdot g}{\eta_p \cdot (L/D)}\right)"
             )
             rb.add_key_value_list([
-                ("{{{E}}}", "Loiter endurance [s]"),
+                ("$${E}$$", "Loiter endurance [s]"),
             ])
 
         if is_elec:
@@ -150,11 +150,11 @@ class WeightEquationsSection(ReportSection):
                 r"W_{battery} = \frac{E_{total}}{\eta_{bat} \cdot e_{bat} \cdot 3600}"
             )
             rb.add_key_value_list([
-                ("{{{P_{avg}}}}",   "Average power required [W]"),
-                ("{{{t_{seg}}}}",   "Duration of segment [s]"),
-                ("{{{E_{total}}}}", "Total electrical energy [J]"),
-                ("{{{\\eta_{bat}}}}", "Battery charge/discharge efficiency"),
-                ("{{{e_{bat}}}}",   "Battery specific energy density [Wh/kg]"),
+                ("$${P_{avg}}$$",   "Average power required [W]"),
+                ("$${t_{seg}}$$",   "Duration of segment [s]"),
+                ("$${E_{total}}$$", "Total electrical energy [J]"),
+                ("$${\\eta_{bat}}$$", "Battery charge/discharge efficiency"),
+                ("$${e_{bat}}$$",   "Battery specific energy density [Wh/kg]"),
             ])
 
         if b.propulsion_type is PropulsionType.HYBRID:

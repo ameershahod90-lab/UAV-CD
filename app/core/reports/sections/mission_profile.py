@@ -30,7 +30,7 @@ class MissionProfileSection(ReportSection):
 
         rb.add_paragraph(
             "The sizing methodology follows Sadraey 2020, Sec. 2.6-2.7, where "
-            "each segment contributes a weight fraction {{{W_i/W_{i-1}}}} to the "
+            "each segment contributes a weight fraction $${W_i/W_{i-1}}$$ to the "
             "overall MTOW buildup. Fixed segments use tabulated fractions "
             "(Table 2.4); cruise and loiter segments use the Breguet "
             "range/endurance equations."

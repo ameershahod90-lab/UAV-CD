@@ -20,7 +20,7 @@ class ConstraintEquationsSection(ReportSection):
 
         intro = (
             "All five performance constraints are derived as functions of "
-            "wing loading {{{W/S}}} and plotted on the matching diagram. "
+            "wing loading $${W/S}$$ and plotted on the matching diagram. "
             "Equation numbers in parentheses are this report's local "
             "references"
         )
@@ -47,7 +47,7 @@ class ConstraintEquationsSection(ReportSection):
             )
             rb.add_paragraph(
                 "where the dynamic pressure is "
-                "{{{q = \\tfrac{1}{2}\\rho_0\\sigma V_{\\max}^{2}}}}.",
+                "$${q = \\tfrac{1}{2}\\rho_0\\sigma V_{\\max}^{2}}$$.",
                 italic=True, indent=True,
             )
         else:
@@ -91,8 +91,8 @@ class ConstraintEquationsSection(ReportSection):
         rb.add_heading("5. Service Ceiling", level=2)
         rb.add_paragraph(
             "At the service ceiling the rate of climb is "
-            "{{{ROC_C = 0.508\\;\\text{m/s}}}} (100 ft/min); the density "
-            "ratio is {{{\\sigma_C = \\rho_{ceiling}/\\rho_{SL}}}}.",
+            "$${ROC_C = 0.508\\;\\text{m/s}}$$ (100 ft/min); the density "
+            "ratio is $${\\sigma_C = \\rho_{ceiling}/\\rho_{SL}}$$.",
             italic=True, indent=True,
         )
         if is_jet:

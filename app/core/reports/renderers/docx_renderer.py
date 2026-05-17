@@ -13,9 +13,9 @@ Design decisions:
     ``add_equation(latex_src)`` with no number argument; the renderer
     assigns and resets the sub-counter on each level-1 heading.
   - Inline math: anywhere text is rendered (add_paragraph, add_note,
-    key-value list values, table cells), the sigil ``{{{LaTeX}}}`` is
+    key-value list values, table cells), the sigil ``$${LaTeX}$$`` is
     detected and converted to an inline OMML run.  Example:
-        rb.add_paragraph("The efficiency {{{\\eta_p}}} captures losses.")
+        rb.add_paragraph("The efficiency $${\\eta_p}$$ captures losses.")
   - Tables use 'Table Grid' style with blue header row and alternating rows.
   - Figures are written to a NamedTemporaryFile, inserted, then cleaned up.
   - All widths are specified in centimetres (docx uses EMU internally).
@@ -76,12 +76,12 @@ def _make_omath(equation_src: str) -> etree._Element:
     return latex_to_omml(equation_src)
 
 
-# Inline math sigil. Any occurrence of ``{{{LATEX}}}`` inside a text
+# Inline math sigil. Any occurrence of ``$${LATEX}$$`` inside a text
 # argument (paragraph, note, table cell, kv-value, …) is replaced by a real
 # inline OMML run. Triple-brace ensures the sigil won't collide with normal
 # prose. The pattern is non-greedy and DOTALL so newlines inside the math
 # source are allowed.
-_INLINE_MATH = re.compile(r"\{\{\{(.+?)\}\}\}", re.DOTALL)
+_INLINE_MATH = re.compile(r"\$\$\{(.+?)\}\$\$", re.DOTALL)
 
 
 def _emit_text_with_math(
@@ -92,7 +92,7 @@ def _emit_text_with_math(
     italic: bool = False,
 ) -> None:
     """Append runs to ``paragraph`` for ``text``, converting any
-    ``{{{LaTeX}}}`` segments to inline OMML math.
+    ``$${LaTeX}$$`` segments to inline OMML math.
 
     Plain text segments become regular ``<w:r>`` runs (honouring
     bold/italic); math segments become inline ``<m:oMath>`` elements
@@ -338,7 +338,7 @@ class DocxBuilder(ReportBuilder):
     ) -> None:
         """Render as a bordered two-column table (label | value).
 
-        Both label and value support inline ``{{{LaTeX}}}`` math.
+        Both label and value support inline ``$${LaTeX}$$`` math.
         """
         if not items:
             return

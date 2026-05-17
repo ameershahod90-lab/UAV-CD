@@ -407,7 +407,7 @@ class TestEquationNumberingAndCitations:
 
 class TestInlineMathTemplate:
     def test_paragraph_inline_math_emits_omml(self, sized_store, tmp_path):
-        """A paragraph containing {{{LaTeX}}} should produce inline OMML
+        """A paragraph containing $${LaTeX}$$ should produce inline OMML
         alongside the surrounding text."""
         from app.core.reports.renderers.docx_renderer import DocxBuilder
         from app.core.reports.renderer import ReportConfig
@@ -416,8 +416,8 @@ class TestInlineMathTemplate:
         rb = DocxBuilder(ReportConfig())
         rb.add_heading("Test Section", level=1)
         rb.add_paragraph(
-            "The propulsive efficiency {{{\\eta_p}}} appears here, and "
-            "so does {{{\\rho_0 V_s^2}}}."
+            "The propulsive efficiency $${\\eta_p}$$ appears here, and "
+            "so does $${\\rho_0 V_s^2}$$."
         )
         rb.save(str(out))
 
@@ -432,14 +432,14 @@ class TestInlineMathTemplate:
         )
 
     def test_inline_math_in_default_export(self, sized_store, tmp_path):
-        """Section files use {{{...}}} in their intros / kv-lists. Confirm
+        """Section files use $${...}$$ in their intros / kv-lists. Confirm
         those round-trip into the rendered .docx as inline OMML."""
         out = tmp_path / "with_inline.docx"
         ok, msg = _export(sized_store, out)
         assert ok, msg
         body = etree.tostring(Document(str(out)).element).decode("utf-8")
-        # The raw {{{...}}} sigil should NOT appear in the rendered doc
-        assert "{{{" not in body, (
+        # The raw $${...}$$ sigil should NOT appear in the rendered doc
+        assert "$${" not in body, (
             "Raw inline-math sigil leaked into the rendered document"
         )
         # And at least one inline OMML run should exist (section intros add them)
@@ -534,7 +534,7 @@ class TestDisplayRules:
 
 class TestIncludeEquationsToggle:
     """include_equations=False skips the displayed (auto-numbered) equation
-    blocks but does NOT scrub inline {{{...}}} math from prose — those are
+    blocks but does NOT scrub inline $${...}$$ math from prose — those are
     integral to the surrounding sentences."""
 
     def test_displayed_equations_excluded_when_toggled_off(

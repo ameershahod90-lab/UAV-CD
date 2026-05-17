@@ -82,7 +82,7 @@ class WeightBreakdownSection(ReportSection):
         rb.add_heading("Segment Weight Fractions", level=2)
         rb.add_paragraph(
             "Each segment reduces the aircraft weight by its fraction "
-            "{{{W_i/W_{i-1}}}}. The product of all fractions gives the overall "
+            "$${W_i/W_{i-1}}$$. The product of all fractions gives the overall "
             "mission weight fraction (Sadraey 2020, Sec. 2.6, Table 2.4)."
         )
 
