@@ -467,6 +467,68 @@ class TestI18n:
         assert "<w:bidi/>" not in body_xml, "English export carried <w:bidi/>"
         assert "<w:bidiVisual/>" not in body_xml, "English export carried <w:bidiVisual/>"
 
+    def test_arabic_runs_have_rtl_marker(self, sized_store, tmp_path):
+        """Each visible text run in the AR export must carry <w:rtl/>.
+
+        Without it, Word treats the run as LTR even inside a <w:bidi/>
+        paragraph — numbers and punctuation drift to the wrong end of
+        the line and Arabic mixed with Latin tokens reads in the wrong
+        order.
+        """
+        doc = self._exported_ar(sized_store, tmp_path)
+        body_xml = etree.tostring(doc.element).decode("utf-8")
+        # Count <w:rtl/> occurrences; should be at least a dozen — every
+        # paragraph that emits text adds one per run.
+        rtl_count = body_xml.count("<w:rtl/>") + body_xml.count("<w:rtl ")
+        assert rtl_count >= 30, (
+            f"Expected many <w:rtl/> markers in AR runs; found {rtl_count}"
+        )
+
+    def test_arabic_export_translates_figure_label(self, sized_store, tmp_path):
+        """The 'Figure' caption label must be translated."""
+        doc = self._exported_ar(sized_store, tmp_path)
+        text = _doc_text(doc)
+        assert "الشكل" in text, "'Figure' caption label not translated to 'الشكل'"
+        # And the LTR-English label must NOT appear in AR captions.
+        # (It can still appear in author-supplied content, but not as the
+        # auto-emitted figure-caption prefix.)
+        # Heuristic: "Figure 1:" / "Figure 2:" should be absent.
+        import re
+        assert not re.search(r"\bFigure \d+:", text), (
+            "AR export still has English 'Figure N:' caption prefix"
+        )
+
+    def test_arabic_export_translates_table_label(self, sized_store, tmp_path):
+        doc = self._exported_ar(sized_store, tmp_path)
+        text = _doc_text(doc)
+        assert "الجدول" in text, "'Table' caption label not translated to 'الجدول'"
+        import re
+        assert not re.search(r"\bTable \d+:", text), (
+            "AR export still has English 'Table N:' caption prefix"
+        )
+
+    def test_arabic_export_translates_note_prefix(self, sized_store, tmp_path):
+        doc = self._exported_ar(sized_store, tmp_path)
+        text = _doc_text(doc)
+        # AR prefix must appear; English "Note:" prefix from add_note must not
+        assert "ملاحظة" in text, "'Note:' prefix not translated to 'ملاحظة:'"
+        # add_note() emits "Note:  " in EN — check the auto-emitted prefix
+        # specifically. (Body prose mentioning "Note" as a word is fine.)
+        assert "Note:  " not in text, (
+            "AR export still has English 'Note:  ' prefix from add_note()"
+        )
+
+    def test_english_export_keeps_english_labels(self, sized_store, tmp_path):
+        """EN export must still say 'Figure', 'Table', 'Note:' — confirms
+        the translation is per-language, not a hardcoded swap."""
+        out = tmp_path / "report_en.docx"
+        ok, _ = _export(sized_store, out)
+        assert ok
+        text = _doc_text(Document(str(out)))
+        import re
+        assert re.search(r"\bFigure \d+:", text), "EN export missing 'Figure N:'"
+        assert re.search(r"\bTable \d+:", text),  "EN export missing 'Table N:'"
+
     def test_arabic_export_covers_every_section(self, sized_store, tmp_path):
         """Each refactored section emits at least one Arabic phrase that
         appears nowhere in the English catalogue — proves it really hit the

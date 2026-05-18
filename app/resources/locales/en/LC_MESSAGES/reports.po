@@ -11,6 +11,17 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+# ── Builder-internal label words (used by DocxBuilder itself) ──────────────
+
+msgid "caption.figure"
+msgstr "Figure"
+
+msgid "caption.table"
+msgstr "Table"
+
+msgid "note.prefix"
+msgstr "Note:"
+
 # ── Common labels (reused across sections) ─────────────────────────────────
 
 msgid "common.dash"
