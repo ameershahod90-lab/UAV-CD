@@ -24,8 +24,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
+from pathlib import Path
+
 from app.core.display_converter import DisplayConverter
 from app.core.entities import RegressionCoeffs  # noqa: F401 (kept for legacy callers)
+from app.core.i18n import load_translator
 from app.core.reports.base import ReportContext, SectionRegistry, SectionEntry
 from app.core.reports.renderer import ExportFormat, ReportConfig
 from app.core.reports.renderers.docx_renderer import DocxBuilder
@@ -34,6 +37,9 @@ from app.services.figure_renderers import (
     render_mission_profile_png,
     render_weight_pie_png,
 )
+
+# Locales directory — relative to the repo root (services/ → app/ → repo)
+_LOCALES_DIR = Path(__file__).resolve().parent.parent / "resources" / "locales"
 
 # Triggers auto-registration of all section classes
 import app.core.reports.sections  # noqa: F401
@@ -94,6 +100,10 @@ class ExportService:
         sizing   = state.sizing
         dc       = DisplayConverter(settings)
 
+        # Build the translator for the requested language; the catalogue is
+        # loaded once per export. Sections call ``ctx.t("key", **kwargs)``.
+        translator = load_translator(_LOCALES_DIR, config.language)
+
         # All three figures are rendered server-side via matplotlib using
         # the shared plot-data builders in app/core/plots/.
         matching_png = render_matching_diagram_png(
@@ -122,6 +132,8 @@ class ExportService:
             mission_profile_png=mission_png,
             weight_pie_chart_png=weight_pie,
             display_converter=dc,
+            language=config.language,
+            translator=translator,
             include_equations=config.include_equations,
             include_sadraey_refs=config.include_sadraey_refs,
         )

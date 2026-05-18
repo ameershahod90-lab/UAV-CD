@@ -14,6 +14,7 @@ python-docx>=1.1.0
 matplotlib>=3.9.0
 Pillow>=10.0.0
 latex2mathml>=3.77.0   # LaTeX → MathML; transformed to OMML for real Word math
+Babel>=2.14            # gettext (.po/.mo) catalogue loader for bilingual reports
 
 # Development
 pytest>=8.0.0

@@ -1,0 +1,126 @@
+# Arabic translations for UAV-CD-APP report export.
+# Variable names (W_{TO}, η_p, etc.), equation labels, section numbers,
+# unit symbols, and citation IDs remain in Latin script / Western numerals
+# — they are universal across languages in technical writing.
+msgid ""
+msgstr ""
+"Project-Id-Version: UAV-CD-APP 1.0\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+# ── Cover page ─────────────────────────────────────────────────────────────
+
+msgid "cover.subtitle"
+msgstr "دراسة التصميم المفهومي للطائرة بدون طيار ثابتة الجناح"
+
+msgid "cover.label.project"
+msgstr "المشروع"
+
+msgid "cover.label.author"
+msgstr "المُعدّ"
+
+msgid "cover.label.revision"
+msgstr "الإصدار"
+
+msgid "cover.label.date"
+msgstr "التاريخ"
+
+msgid "cover.note.auto_generated"
+msgstr ""
+"تم إنشاء هذا التقرير آلياً بواسطة تطبيق UAV-CD-APP لتصميم الطائرات بدون "
+"طيار. جميع الحسابات الهندسية تتبع مرجع: "
+"Sadraey (2020), Design of Unmanned Aerial Systems."
+
+# ── Constraint status ──────────────────────────────────────────────────────
+
+msgid "section.constraint_status.title"
+msgstr "حالة القيود التصميمية"
+
+msgid "section.constraint_status.heading.summary"
+msgstr "ملخص القيود"
+
+msgid "section.constraint_status.note.no_result"
+msgstr "تحليل القيود غير متوفر — يرجى تشغيل عملية التصميم أولاً."
+
+msgid "section.constraint_status.banner.pass"
+msgstr ""
+"ناجح: نقطة التصميم المختارة تستوفي جميع قيود الأداء. "
+"يقع التصميم ضمن المنطقة المسموح بها في مخطط المطابقة."
+
+msgid "section.constraint_status.banner.violations"
+msgstr ""
+"نقطة التصميم المختارة تنتهك {count} من قيود الأداء. التفاصيل أدناه."
+
+msgid "section.constraint_status.col.constraint"
+msgstr "القيد"
+
+msgid "section.constraint_status.col.status"
+msgstr "الحالة"
+
+msgid "section.constraint_status.col.notes"
+msgstr "ملاحظات"
+
+msgid "section.constraint_status.col.details"
+msgstr "التفاصيل"
+
+msgid "section.constraint_status.col.current"
+msgstr "القيمة الحالية"
+
+msgid "section.constraint_status.col.limit"
+msgstr "الحد"
+
+msgid "section.constraint_status.table.summary_caption"
+msgstr "ملخص فحص القيود عند نقطة التصميم"
+
+msgid "section.constraint_status.table.violations_caption"
+msgstr "انتهاكات القيود عند نقطة التصميم المختارة"
+
+msgid "section.constraint_status.notes.see_diagram"
+msgstr "راجع مخطط المطابقة"
+
+msgid "section.constraint_status.notes.stall_limit"
+msgstr "حد W/S = {limit:.1f} N/m²"
+
+msgid "status.pass"
+msgstr "ناجح"
+
+msgid "status.warn"
+msgstr "تحذير"
+
+msgid "status.fail"
+msgstr "فاشل"
+
+# ── Appendix references ────────────────────────────────────────────────────
+
+msgid "section.appendix_references.title"
+msgstr "الملحق ب: المراجع"
+
+msgid "section.appendix_references.intro"
+msgstr "جميع الحسابات الهندسية في هذا التقرير تستند إلى المراجع التالية:"
+
+msgid "section.appendix_references.ref.sadraey"
+msgstr ""
+"Sadraey, M. H. (2020). Design of Unmanned Aerial Systems. "
+"John Wiley & Sons. ISBN 978-1-119-50862-5."
+
+msgid "section.appendix_references.ref.keane"
+msgstr ""
+"Keane, A. J., Sóbester, A., & Scanlan, J. P. (2017). Small Unmanned "
+"Fixed-Wing Aircraft Design: A Practical Approach. Wiley."
+
+msgid "section.appendix_references.ref.dsto"
+msgstr ""
+"DSTO ADA623605 — قاعدة بيانات الطائرات بدون طيار لمعاملات الأبعاد "
+"والأداء (قوانين القياس التاريخية)."
+
+msgid "section.appendix_references.heading.tooling"
+msgstr "الأدوات والمنهجية"
+
+msgid "section.appendix_references.tooling.note"
+msgstr ""
+"تم إنشاء هذا التقرير بواسطة تطبيق UAV-CD-APP "
+"(Python 3.14, PyQt6, pyqtgraph, numpy, scipy, python-docx, matplotlib). "
+"يتبع تحليل القيود قسم 2.9 من Sadraey بدقة؛ وتقدير الوزن يتبع 2.6-2.7."

@@ -12,14 +12,15 @@ class AppendixReferencesSection(ReportSection):
     description   = "Bibliography: Sadraey textbook and other cited sources"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        # Section title — translated. The numerical "B" stays in Latin
+        # script because it's a cross-reference identifier.
+        rb.add_heading(t("section.appendix_references.title"), level=1)
+        rb.add_paragraph(t("section.appendix_references.intro"))
         rb.add_bulleted_list([
-            "Sadraey, M. H. (2020). Design of Unmanned Aerial Systems. "
-            "Aerospace Series. Wiley & Sons. ISBN 978-1-119-50862-5.",
-
-            "DSTO UAV Database — Historical scaling laws for fixed-wing UAVs, "
-            "used for regression coefficients and sanity checks.",
-
-            "UAV-CD-APP — UAV Conceptual Design Application. "
-            f"Design report generated on {ctx.date_str}.",
+            t("section.appendix_references.ref.sadraey"),
+            t("section.appendix_references.ref.keane"),
+            t("section.appendix_references.ref.dsto"),
         ])
+        rb.add_heading(t("section.appendix_references.heading.tooling"), level=2)
+        rb.add_paragraph(t("section.appendix_references.tooling.note"))

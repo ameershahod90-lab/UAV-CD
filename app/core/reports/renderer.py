@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from app.core.i18n import Language
+
 
 # ===========================================================================
 # Export Format
@@ -54,6 +56,11 @@ class ReportConfig:
     include_equations:    bool = True
     include_sadraey_refs: bool = True
     logo_path: Optional[str]  = None   # path to custom logo image
+
+    # ── Language ─────────────────────────────────────────────────────
+    # English by default; AR flips paragraph direction, complex-script
+    # font, and translates every catalogued string.
+    language: Language = Language.EN
 
 
 # ===========================================================================

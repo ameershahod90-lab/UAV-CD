@@ -146,7 +146,9 @@ class ReportContext:
         RegressionCoeffs,
     )
     from app.core.display_converter import DisplayConverter
+    from app.core.i18n import Language, Translator
     from app.state.settings import UserSettings
+    from typing import Any, Callable
 
     # ── Report metadata ───────────────────────────────────────────────────
     project_name: str
@@ -173,9 +175,21 @@ class ReportContext:
     # ── Display converter ─────────────────────────────────────────────────
     display_converter: DisplayConverter
 
+    # ── i18n ──────────────────────────────────────────────────────────────
+    # Sections call ``ctx.t("key", **kwargs)`` to get a translated string.
+    # ``language`` and ``translator`` are also exposed for renderer-level
+    # decisions (e.g. RTL paragraph properties, Arabic complex-script font).
+    language:   Language
+    translator: Translator
+
     # ── Report options ────────────────────────────────────────────────────
     include_equations:     bool = True
     include_sadraey_refs:  bool = True
+
+    @property
+    def t(self) -> "Callable[..., str]":
+        """Shortcut for ``self.translator.t`` — section authors use this."""
+        return self.translator.t
 
 
 # ===========================================================================

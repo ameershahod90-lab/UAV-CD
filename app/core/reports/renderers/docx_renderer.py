@@ -90,6 +90,7 @@ def _emit_text_with_math(
     *,
     bold: bool = False,
     italic: bool = False,
+    complex_script_font: Optional[str] = None,
 ) -> None:
     """Append runs to ``paragraph`` for ``text``, converting any
     ``$${LaTeX}$$`` segments to inline OMML math.
@@ -97,6 +98,10 @@ def _emit_text_with_math(
     Plain text segments become regular ``<w:r>`` runs (honouring
     bold/italic); math segments become inline ``<m:oMath>`` elements
     appended directly to the paragraph's ``<w:p>``.
+
+    If ``complex_script_font`` is set, it is applied to each text run via
+    ``run.font.complex_script_font`` — needed for Arabic glyphs since the
+    Latin body font (Calibri) lacks proper Arabic shaping.
     """
     pos = 0
     for m in _INLINE_MATH.finditer(text):
@@ -105,6 +110,8 @@ def _emit_text_with_math(
             run = paragraph.add_run(before)
             run.bold = bold
             run.italic = italic
+            if complex_script_font:
+                _apply_complex_script_font(run, complex_script_font)
         # Append the OMML element directly to the <w:p> (not wrapped in a run)
         paragraph._p.append(latex_to_omml(m.group(1)))
         pos = m.end()
@@ -113,6 +120,45 @@ def _emit_text_with_math(
         run = paragraph.add_run(tail)
         run.bold = bold
         run.italic = italic
+        if complex_script_font:
+            _apply_complex_script_font(run, complex_script_font)
+
+
+def _apply_complex_script_font(run, font_name: str) -> None:
+    """Set the complex-script font on a run via ``<w:rFonts w:cs="…"/>``."""
+    rPr = run._r.get_or_add_rPr()
+    # python-docx exposes rFonts via descriptor but only for the Latin face;
+    # set the cs (complex-script) attribute directly.
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = OxmlElement("w:rFonts")
+        rPr.append(rFonts)
+    rFonts.set(qn("w:cs"), font_name)
+
+
+def _set_paragraph_rtl(paragraph) -> None:
+    """Mark a paragraph as right-to-left via ``<w:bidi/>``.
+
+    Affects default alignment, tab-stop direction, and list ordering for
+    Arabic body text.
+    """
+    pPr = paragraph._p.get_or_add_pPr()
+    if pPr.find(qn("w:bidi")) is None:
+        pPr.append(OxmlElement("w:bidi"))
+
+
+def _set_table_rtl(table) -> None:
+    """Mark a table as RTL via ``<w:bidiVisual/>`` on the table properties.
+
+    Word will display columns right-to-left (the first authored column
+    becomes the rightmost visible column).
+    """
+    tblPr = table._tbl.find(qn("w:tblPr"))
+    if tblPr is None:
+        tblPr = OxmlElement("w:tblPr")
+        table._tbl.insert(0, tblPr)
+    if tblPr.find(qn("w:bidiVisual")) is None:
+        tblPr.append(OxmlElement("w:bidiVisual"))
 
 
 class DocxBuilder(ReportBuilder):
@@ -125,6 +171,11 @@ class DocxBuilder(ReportBuilder):
         self._figure_counter:  int = 0
         self._table_counter:   int = 0
         self._eq_subcounter:   int = 0   # resets on every level-1 heading
+        # Language-driven layout switches. None == LTR / no special font.
+        self._is_rtl: bool = config.language.is_rtl
+        self._cs_font: Optional[str] = (
+            config.language.complex_script_font if self._is_rtl else None
+        )
         self._setup_document()
 
     # ── Document setup ────────────────────────────────────────────────────
@@ -171,10 +222,20 @@ class DocxBuilder(ReportBuilder):
         if level == 1:
             self._section_counter += 1
             self._eq_subcounter = 0   # restart equation numbering per section
+            # Section/heading numbers stay Western (Latin digits) even in RTL
+            # mode — they're cross-reference IDs, not localised content.
             numbered = f"{self._section_counter}.  {text}"
         else:
             numbered = text
-        self._doc.add_heading(numbered, level=min(level, 3))
+        heading = self._doc.add_heading(numbered, level=min(level, 3))
+        # Headings carry text-with-math too via the inline-math sigil, but
+        # python-docx already inserted the literal text as a run. Apply RTL +
+        # complex-script font to the heading paragraph and its existing runs.
+        if self._is_rtl:
+            _set_paragraph_rtl(heading)
+            if self._cs_font:
+                for run in heading.runs:
+                    _apply_complex_script_font(run, self._cs_font)
 
     def add_paragraph(
         self,
@@ -186,7 +247,12 @@ class DocxBuilder(ReportBuilder):
         p = self._doc.add_paragraph()
         if indent:
             p.paragraph_format.left_indent = Cm(1)
-        _emit_text_with_math(p, text, bold=bold, italic=italic)
+        if self._is_rtl:
+            _set_paragraph_rtl(p)
+        _emit_text_with_math(
+            p, text, bold=bold, italic=italic,
+            complex_script_font=self._cs_font,
+        )
 
     def add_page_break(self) -> None:
         self._doc.add_page_break()
@@ -205,6 +271,8 @@ class DocxBuilder(ReportBuilder):
         table = self._doc.add_table(rows=row_count, cols=col_count)
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        if self._is_rtl:
+            _set_table_rtl(table)
 
         # Header row
         hdr_cells = table.rows[0].cells
@@ -213,7 +281,11 @@ class DocxBuilder(ReportBuilder):
             _shade_cell(cell, "1A5C96")
             p = cell.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            _emit_text_with_math(p, str(hdr), bold=True)
+            if self._is_rtl:
+                _set_paragraph_rtl(p)
+            _emit_text_with_math(
+                p, str(hdr), bold=True, complex_script_font=self._cs_font,
+            )
             # White text on the blue header — recolor whatever runs ended up there
             for run in p.runs:
                 run.font.color.rgb = _WHITE
@@ -226,18 +298,30 @@ class DocxBuilder(ReportBuilder):
                 cell = cells[c_idx]
                 _shade_cell(cell, fill)
                 p = cell.paragraphs[0]
+                # In RTL mode "first column" is rendered rightmost, so the
+                # author's first column should remain LEFT-aligned (which
+                # Word will visually flip to RIGHT in the bidi table).
                 p.alignment = (
                     WD_ALIGN_PARAGRAPH.CENTER if c_idx > 0
                     else WD_ALIGN_PARAGRAPH.LEFT
                 )
-                _emit_text_with_math(p, str(cell_text))
+                if self._is_rtl:
+                    _set_paragraph_rtl(p)
+                _emit_text_with_math(
+                    p, str(cell_text), complex_script_font=self._cs_font,
+                )
 
         if caption:
-            cap_p = self._doc.add_paragraph(
-                f"Table {self._table_counter}: {caption}"
+            cap_p = self._doc.add_paragraph()
+            if self._is_rtl:
+                _set_paragraph_rtl(cap_p)
+            # Table number stays Western (Latin digits) — it's a cross-ref ID.
+            _emit_text_with_math(
+                cap_p, f"Table {self._table_counter}: {caption}",
+                italic=True, complex_script_font=self._cs_font,
             )
-            cap_p.runs[0].italic = True
-            cap_p.runs[0].font.size = Pt(9)
+            for run in cap_p.runs:
+                run.font.size = Pt(9)
             cap_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         self._doc.add_paragraph()   # spacer
@@ -262,11 +346,15 @@ class DocxBuilder(ReportBuilder):
             os.unlink(tmp.name)
 
         if caption:
-            cap_p = self._doc.add_paragraph(
-                f"Figure {self._figure_counter}: {caption}"
+            cap_p = self._doc.add_paragraph()
+            if self._is_rtl:
+                _set_paragraph_rtl(cap_p)
+            _emit_text_with_math(
+                cap_p, f"Figure {self._figure_counter}: {caption}",
+                italic=True, complex_script_font=self._cs_font,
             )
-            cap_p.runs[0].italic = True
-            cap_p.runs[0].font.size = Pt(9)
+            for run in cap_p.runs:
+                run.font.size = Pt(9)
             cap_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         self._doc.add_paragraph()
@@ -345,13 +433,23 @@ class DocxBuilder(ReportBuilder):
         table = self._doc.add_table(rows=len(items), cols=2)
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.LEFT
+        if self._is_rtl:
+            _set_table_rtl(table)
         for r, (lbl, val) in enumerate(items):
             row = table.rows[r]
             fill = "F5F5F5" if r % 2 == 0 else "FFFFFF"
             _shade_cell(row.cells[0], fill)
             _shade_cell(row.cells[1], fill)
-            _emit_text_with_math(row.cells[0].paragraphs[0], str(lbl), bold=True)
-            _emit_text_with_math(row.cells[1].paragraphs[0], str(val))
+            for cell, content, bold in (
+                (row.cells[0], str(lbl), True),
+                (row.cells[1], str(val), False),
+            ):
+                p = cell.paragraphs[0]
+                if self._is_rtl:
+                    _set_paragraph_rtl(p)
+                _emit_text_with_math(
+                    p, content, bold=bold, complex_script_font=self._cs_font,
+                )
         self._doc.add_paragraph()
 
     def add_bulleted_list(self, items: list[str]) -> None:
@@ -362,12 +460,21 @@ class DocxBuilder(ReportBuilder):
         p = self._doc.add_paragraph()
         p.paragraph_format.left_indent  = Cm(1.0)
         p.paragraph_format.right_indent = Cm(1.0)
-        # "Note:" prefix as a plain text label, then the message (with inline math)
+        if self._is_rtl:
+            _set_paragraph_rtl(p)
+        # "Note:" prefix label, then the message (with inline math).
+        # The prefix word itself is not translated here — section authors
+        # who want a localised "Note" prefix can include it in the text
+        # argument via ctx.t("note.prefix") + their message.
         label = p.add_run("Note:  ")
         label.bold = True
         label.font.size = Pt(10)
         label.font.color.rgb = RGBColor(0x4A, 0x4A, 0x4A)
-        _emit_text_with_math(p, text, italic=True)
+        if self._cs_font:
+            _apply_complex_script_font(label, self._cs_font)
+        _emit_text_with_math(
+            p, text, italic=True, complex_script_font=self._cs_font,
+        )
         # Re-style the emitted runs so the note appears uniformly muted
         for run in p.runs[1:]:
             run.font.size = Pt(10)

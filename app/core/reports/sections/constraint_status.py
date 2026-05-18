@@ -12,63 +12,73 @@ class ConstraintStatusSection(ReportSection):
     description   = "Feasible/violated status of each constraint at the design point"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        rb.add_heading(t("section.constraint_status.title"), level=1)
 
         dp = ctx.design_point
         cr = ctx.constraint_result
 
         if dp is None or cr is None:
-            rb.add_note("Constraint analysis not available — run sizing first.")
+            rb.add_note(t("section.constraint_status.note.no_result"))
             return
 
         violations = dp.violated_constraints   # tuple[ConstraintViolation, ...]
 
         if violations:
             rb.add_paragraph(
-                f"WARNING:  The selected design point violates "
-                f"{len(violations)} constraint(s).  Review the matching diagram "
-                f"and adjust the design point or mission requirements.",
+                t("section.constraint_status.banner.violations",
+                  count=len(violations)),
                 bold=True,
             )
             viol_rows = []
             for v in violations:
                 viol_rows.append([
+                    # Constraint names are domain identifiers (Max Speed,
+                    # Takeoff Run, etc.); they currently come from the analyser
+                    # in English. A follow-up will move them through ctx.t too.
                     v.constraint_name,
-                    "VIOLATED",
+                    t("status.fail"),
                     v.description[:120] if v.description else "—",
                     f"{v.current_value:.3f} {v.unit}",
                     f"{v.limit_value:.3f} {v.unit}",
                 ])
             rb.add_table(
-                headers=["Constraint", "Status", "Details", "Current", "Limit"],
+                headers=[
+                    t("section.constraint_status.col.constraint"),
+                    t("section.constraint_status.col.status"),
+                    t("section.constraint_status.col.details"),
+                    t("section.constraint_status.col.current"),
+                    t("section.constraint_status.col.limit"),
+                ],
                 rows=viol_rows,
-                caption="Constraint violations at selected design point",
+                caption=t("section.constraint_status.table.violations_caption"),
             )
         else:
-            rb.add_paragraph(
-                "PASS:  The selected design point satisfies all performance "
-                "constraints.  The design is within the feasible region of "
-                "the matching diagram.",
-                bold=True,
-            )
+            rb.add_paragraph(t("section.constraint_status.banner.pass"), bold=True)
 
         # Per-constraint summary table
-        rb.add_heading("Per-Constraint Summary", level=2)
+        rb.add_heading(t("section.constraint_status.heading.summary"), level=2)
         violated_names = {v.constraint_name for v in violations}
 
         status_rows = [
-            ["Stall", "FAIL" if "Stall" in violated_names else "PASS",
-             f"W/S limit = {cr.stall_ws_nm2:.1f} N/m²"],
+            ["Stall",
+             t("status.fail") if "Stall" in violated_names else t("status.pass"),
+             t("section.constraint_status.notes.stall_limit",
+               limit=cr.stall_ws_nm2)],
         ]
         for curve in cr.curves:
             status_rows.append([
                 curve.name,
-                "FAIL" if curve.name in violated_names else "PASS",
-                "See matching diagram",
+                t("status.fail") if curve.name in violated_names else t("status.pass"),
+                t("section.constraint_status.notes.see_diagram"),
             ])
 
         rb.add_table(
-            headers=["Constraint", "Status", "Notes"],
+            headers=[
+                t("section.constraint_status.col.constraint"),
+                t("section.constraint_status.col.status"),
+                t("section.constraint_status.col.notes"),
+            ],
             rows=status_rows,
-            caption="Constraint check summary at design point",
+            caption=t("section.constraint_status.table.summary_caption"),
         )

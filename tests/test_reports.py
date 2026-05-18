@@ -65,7 +65,17 @@ def sized_store(store):
     return store
 
 
-def _build_context(store: AppStore, *, include_equations: bool = True) -> ReportContext:
+_LOCALES_DIR = Path(__file__).resolve().parent.parent / "app" / "resources" / "locales"
+
+
+def _build_context(
+    store: AppStore,
+    *,
+    include_equations: bool = True,
+    language: "Language | None" = None,
+) -> ReportContext:
+    from app.core.i18n import Language as _Lang, load_translator
+    lang = language or _Lang.EN
     s = store.state
     return ReportContext(
         project_name="Test Project",
@@ -83,6 +93,8 @@ def _build_context(store: AppStore, *, include_equations: bool = True) -> Report
         mission_profile_png=None,
         weight_pie_chart_png=None,
         display_converter=DisplayConverter(store.settings),
+        language=lang,
+        translator=load_translator(_LOCALES_DIR, lang),
         include_equations=include_equations,
         include_sadraey_refs=True,
     )
@@ -352,6 +364,108 @@ class TestOMMLBuilder:
         s = etree.tostring(el)
         reparsed = etree.fromstring(s)
         assert reparsed.tag.endswith("}oMath")
+
+
+# ── Bilingual report (English / Arabic via gettext) ─────────────────────────
+
+
+class TestI18n:
+    """Translator + RTL layout for the Arabic report variant."""
+
+    def _exported_ar(self, store, tmp_path):
+        from app.core.i18n import Language
+        from app.services.export_service import ExportService
+        from app.core.reports.base import SectionRegistry
+        out = tmp_path / "report_ar.docx"
+        cfg = ReportConfig(
+            report_title="تقرير اختبار",
+            author="مختبر",
+            revision="1.0",
+            format=ExportFormat.DOCX,
+            sections=SectionRegistry.default_manifest(),
+            output_path=str(out),
+            language=Language.AR,
+        )
+        ok, msg = ExportService(store).export(cfg)
+        assert ok, msg
+        return Document(str(out))
+
+    def test_translator_returns_arabic_for_known_keys(self):
+        from app.core.i18n import Language
+        from app.core.i18n.translator import load_translator
+        from pathlib import Path
+        loc = Path(__file__).resolve().parent.parent / "app" / "resources" / "locales"
+        t = load_translator(loc, Language.AR)
+        assert t.t("cover.label.project") == "المشروع"
+        assert t.t("status.pass") == "ناجح"
+
+    def test_translator_falls_back_to_key_for_unknown(self):
+        from app.core.i18n import Language
+        from app.core.i18n.translator import load_translator
+        from pathlib import Path
+        loc = Path(__file__).resolve().parent.parent / "app" / "resources" / "locales"
+        t = load_translator(loc, Language.AR)
+        assert t.t("does.not.exist") == "does.not.exist"
+
+    def test_smart_format_preserves_math_zones(self):
+        from app.core.i18n import smart_format
+        template = r"area: {area:.2f} {unit}, with $${C_{L_{max}}}$$ from regression"
+        result = smart_format(template, area=1.523, unit="m²")
+        assert "1.52" in result and "m²" in result
+        assert "$${C_{L_{max}}}$$" in result, "math zone braces were mangled"
+
+    def test_arabic_export_paragraphs_have_bidi_marker(self, sized_store, tmp_path):
+        """RTL paragraphs must carry <w:bidi/> so Word lays them out correctly."""
+        doc = self._exported_ar(sized_store, tmp_path)
+        body_xml = etree.tostring(doc.element).decode("utf-8")
+        assert "<w:bidi/>" in body_xml or "<w:bidi " in body_xml, (
+            "Arabic export missing <w:bidi/> on paragraphs"
+        )
+
+    def test_arabic_export_tables_have_bidi_visual(self, sized_store, tmp_path):
+        """Tables in RTL mode use <w:bidiVisual/> for column-flip."""
+        doc = self._exported_ar(sized_store, tmp_path)
+        body_xml = etree.tostring(doc.element).decode("utf-8")
+        assert "<w:bidiVisual/>" in body_xml or "<w:bidiVisual " in body_xml, (
+            "Arabic export missing <w:bidiVisual/> on tables"
+        )
+
+    def test_arabic_export_uses_complex_script_font(self, sized_store, tmp_path):
+        """Text runs in RTL mode must declare a complex-script font (cs= attr)."""
+        doc = self._exported_ar(sized_store, tmp_path)
+        body_xml = etree.tostring(doc.element).decode("utf-8")
+        assert 'w:cs="Tahoma"' in body_xml, (
+            "Arabic export missing complex-script font on runs"
+        )
+
+    def test_arabic_export_contains_arabic_glyphs(self, sized_store, tmp_path):
+        """Translated text should actually contain Arabic characters."""
+        doc = self._exported_ar(sized_store, tmp_path)
+        full_text = _doc_text(doc)
+        # Catalogue contains at least these strings translated to Arabic
+        assert "المشروع" in full_text, "cover.label.project not translated"
+        assert "ناجح" in full_text or "فاشل" in full_text, (
+            "status.pass / status.fail not translated"
+        )
+
+    def test_equation_numbers_stay_western_in_arabic(self, sized_store, tmp_path):
+        """Equation labels like (1.2) keep Latin digits even in Arabic mode."""
+        import re
+        doc = self._exported_ar(sized_store, tmp_path)
+        full_text = _doc_text(doc)
+        # At least one (N.M) label with Western digits must appear
+        assert re.search(r"\(\d+\.\d+\)", full_text), (
+            "Arabic export lost Western-digit equation labels"
+        )
+
+    def test_english_export_has_no_bidi_markers(self, sized_store, tmp_path):
+        """The LTR (default English) export must not emit any RTL markers."""
+        out = tmp_path / "report_en.docx"
+        ok, msg = _export(sized_store, out)
+        assert ok, msg
+        body_xml = etree.tostring(Document(str(out)).element).decode("utf-8")
+        assert "<w:bidi/>" not in body_xml, "English export carried <w:bidi/>"
+        assert "<w:bidiVisual/>" not in body_xml, "English export carried <w:bidiVisual/>"
 
 
 # ── Server-side figure renderers & shared plot-data builders ────────────────

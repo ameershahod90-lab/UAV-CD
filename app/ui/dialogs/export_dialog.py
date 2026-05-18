@@ -24,6 +24,7 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -42,6 +43,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.core.i18n import Language
 from app.core.reports.base import SectionEntry, SectionRegistry
 from app.core.reports.renderer import ExportFormat, ReportConfig
 
@@ -175,9 +177,16 @@ class ExportDialog(QDialog):
         )
         self._revision_edit = QLineEdit("1.0")
 
+        # Language selector — defaults to English. (A Settings-level default
+        # is planned for a later phase when the live UI itself gains i18n.)
+        self._language_combo = QComboBox()
+        for lang in Language:
+            self._language_combo.addItem(lang.display_name, lang)
+
         form.addRow("Report Title:", self._title_edit)
         form.addRow("Author:",       self._author_edit)
         form.addRow("Revision:",     self._revision_edit)
+        form.addRow("Language:",     self._language_combo)
         layout.addWidget(meta_group)
 
         # ── Output path ───────────────────────────────────────────────────
@@ -347,6 +356,7 @@ class ExportDialog(QDialog):
             sections=self._collect_manifest(),
             include_equations=self._eq_check.isChecked(),
             include_sadraey_refs=self._ref_check.isChecked(),
+            language=self._language_combo.currentData(),
         )
 
         self._export_btn.setEnabled(False)
