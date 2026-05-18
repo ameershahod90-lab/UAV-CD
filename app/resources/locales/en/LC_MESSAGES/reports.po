@@ -11,6 +11,63 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+# ── Common labels (reused across sections) ─────────────────────────────────
+
+msgid "common.dash"
+msgstr "—"
+
+msgid "common.yes"
+msgstr "Yes"
+
+msgid "common.no"
+msgstr "No"
+
+msgid "common.fixed_fraction"
+msgstr "Fixed fraction"
+
+msgid "common.see_diagram"
+msgstr "See matching diagram"
+
+# ── Status labels (PASS/WARN/FAIL) ─────────────────────────────────────────
+
+msgid "status.pass"
+msgstr "PASS"
+
+msgid "status.warn"
+msgstr "WARN"
+
+msgid "status.fail"
+msgstr "FAIL"
+
+msgid "status.icon_pass"
+msgstr "✓  PASS"
+
+msgid "status.icon_warn"
+msgstr "⚠  WARN"
+
+msgid "status.icon_fail"
+msgstr "✗  FAIL"
+
+# ── Common column headers ──────────────────────────────────────────────────
+
+msgid "col.parameter"
+msgstr "Parameter"
+
+msgid "col.value"
+msgstr "Value"
+
+msgid "col.description"
+msgstr "Description"
+
+msgid "col.status"
+msgstr "Status"
+
+msgid "col.notes"
+msgstr "Notes"
+
+msgid "col.unit"
+msgstr "Unit"
+
 # ── Cover page ─────────────────────────────────────────────────────────────
 
 msgid "cover.subtitle"
@@ -33,6 +90,544 @@ msgstr ""
 "This report was generated automatically by UAV-CD-APP (UAV Conceptual "
 "Design Application). All engineering calculations follow Sadraey (2020), "
 "Design of Unmanned Aerial Systems."
+
+# ── Mission requirements ───────────────────────────────────────────────────
+
+msgid "section.mission_requirements.title"
+msgstr "Mission Requirements"
+
+msgid "section.mission_requirements.intro"
+msgstr ""
+"The following mission requirements form the basis of the sizing study. "
+"All calculations are performed in SI units."
+
+msgid "section.mission_requirements.heading.segments"
+msgstr "Mission Segments"
+
+msgid "section.mission_requirements.table.brief_caption"
+msgstr "Mission design requirements and aerodynamic parameters"
+
+msgid "section.mission_requirements.table.segments_caption"
+msgstr "Mission segment profile"
+
+msgid "section.mission_requirements.col.segment_type"
+msgstr "Segment Type"
+
+msgid "section.mission_requirements.col.enabled"
+msgstr "Enabled"
+
+msgid "section.mission_requirements.col.energy_source"
+msgstr "Energy Source"
+
+msgid "section.mission_requirements.col.parameters"
+msgstr "Parameters"
+
+msgid "section.mission_requirements.kv.total_range"
+msgstr "Total Range from enabled cruise segments"
+
+msgid "section.mission_requirements.kv.total_endurance"
+msgstr "Total Endurance from enabled loiter segments"
+
+# Mission requirement row labels
+msgid "mr.row.payload_mass"
+msgstr "Payload Mass"
+
+msgid "mr.row.cruise_speed"
+msgstr "Cruise Speed"
+
+msgid "mr.row.stall_speed"
+msgstr "Stall Speed"
+
+msgid "mr.row.max_speed"
+msgstr "Max Speed"
+
+msgid "mr.row.rate_of_climb"
+msgstr "Rate of Climb"
+
+msgid "mr.row.cruise_altitude"
+msgstr "Cruise Altitude"
+
+msgid "mr.row.service_ceiling"
+msgstr "Service Ceiling"
+
+msgid "mr.row.takeoff_run"
+msgstr "Takeoff Run"
+
+msgid "mr.row.propulsion_type"
+msgstr "Propulsion Type"
+
+msgid "mr.row.aspect_ratio"
+msgstr "Aspect Ratio (AR)"
+
+msgid "mr.row.c_d0"
+msgstr "CD₀"
+
+msgid "mr.row.c_l_max"
+msgstr "CLmax"
+
+msgid "mr.row.oswald"
+msgstr "Oswald Efficiency (e)"
+
+msgid "mr.row.prop_efficiency"
+msgstr "Propulsive Efficiency $${\\eta_p}$$"
+
+msgid "mr.row.sfc"
+msgstr "SFC (Specific Fuel Consumption)"
+
+msgid "mr.row.battery_energy_density"
+msgstr "Battery Energy Density"
+
+msgid "mr.row.battery_efficiency"
+msgstr "Battery Efficiency"
+
+# Row-description column
+msgid "mr.desc.payload_mass"
+msgstr "Design payload"
+
+msgid "mr.desc.cruise_speed"
+msgstr "Nominal cruise airspeed"
+
+msgid "mr.desc.stall_speed"
+msgstr "Minimum safe airspeed"
+
+msgid "mr.desc.max_speed"
+msgstr "Maximum level airspeed"
+
+msgid "mr.desc.rate_of_climb"
+msgstr "Climb rate at sea level"
+
+msgid "mr.desc.cruise_altitude"
+msgstr "Nominal cruise altitude"
+
+msgid "mr.desc.service_ceiling"
+msgstr "Maximum altitude (ROC = 0.508 m/s)"
+
+msgid "mr.desc.takeoff_run"
+msgstr "Ground roll distance"
+
+msgid "mr.desc.propulsion_type"
+msgstr "Propulsion category"
+
+msgid "mr.desc.aspect_ratio"
+msgstr "Wing aspect ratio"
+
+msgid "mr.desc.c_d0"
+msgstr "Zero-lift drag coefficient"
+
+msgid "mr.desc.c_l_max"
+msgstr "Maximum lift coefficient"
+
+msgid "mr.desc.oswald"
+msgstr "Span efficiency factor"
+
+msgid "mr.desc.prop_efficiency"
+msgstr "Propulsive efficiency (propeller or 1.0 for jet)"
+
+msgid "mr.desc.sfc"
+msgstr "Specific fuel consumption"
+
+msgid "mr.desc.battery_energy_density"
+msgstr "Li-Po cell specific energy"
+
+msgid "mr.desc.battery_efficiency"
+msgstr "Battery charge/discharge efficiency"
+
+# Cruise/Loiter parameter formatters
+msgid "mr.params.cruise_range"
+msgstr "Range: {range_km:.1f} km"
+
+msgid "mr.params.loiter_endurance"
+msgstr "Endurance: {endurance_hr:.2f} hr"
+
+# ── Mission profile ────────────────────────────────────────────────────────
+
+msgid "section.mission_profile.title"
+msgstr "Mission Profile"
+
+msgid "section.mission_profile.intro"
+msgstr ""
+"The mission profile defines the sequence of flight phases from takeoff "
+"to landing. Each segment contributes to the total weight fraction and "
+"energy budget of the aircraft."
+
+msgid "section.mission_profile.figure_caption"
+msgstr "Mission altitude profile — altitude vs. cumulative range/time"
+
+msgid "section.mission_profile.no_diagram_note"
+msgstr "Mission profile diagram not available — run sizing first."
+
+msgid "section.mission_profile.methodology"
+msgstr ""
+"The sizing methodology follows Sadraey 2020, Sec. 2.6-2.7, where each "
+"segment contributes a weight fraction $${W_i/W_{i-1}}$$ to the overall "
+"MTOW buildup. Fixed segments use tabulated fractions (Table 2.4); cruise "
+"and loiter segments use the Breguet range/endurance equations."
+
+# ── Weight breakdown ───────────────────────────────────────────────────────
+
+msgid "section.weight_breakdown.title"
+msgstr "Weight Estimation"
+
+msgid "section.weight_breakdown.no_result_note"
+msgstr "Weight estimation results not available — run sizing first."
+
+msgid "section.weight_breakdown.intro"
+msgstr ""
+"Takeoff weight is estimated using the iterative Breguet mission-fraction "
+"method (Sadraey 2020, Sec. 2.6-2.7). The weight loop converges when "
+"successive MTOW estimates differ by less than 0.1 g."
+
+msgid "section.weight_breakdown.heading.mass_summary"
+msgstr "Mass Summary"
+
+msgid "section.weight_breakdown.heading.segment_fractions"
+msgstr "Segment Weight Fractions"
+
+msgid "section.weight_breakdown.segments_intro"
+msgstr ""
+"Each segment reduces the aircraft weight by its fraction "
+"$${W_i/W_{i-1}}$$. The product of all fractions gives the overall "
+"mission weight fraction (Sadraey 2020, Sec. 2.6, Table 2.4)."
+
+msgid "section.weight_breakdown.table.summary_caption"
+msgstr "UAV mass breakdown"
+
+msgid "section.weight_breakdown.table.fractions_caption"
+msgstr "Per-segment weight fractions and cumulative mass"
+
+msgid "section.weight_breakdown.figure_caption"
+msgstr "Weight component distribution"
+
+msgid "section.weight_breakdown.col.component"
+msgstr "Component"
+
+msgid "section.weight_breakdown.col.mass"
+msgstr "Mass"
+
+msgid "section.weight_breakdown.col.pct_mtow"
+msgstr "% MTOW"
+
+msgid "section.weight_breakdown.col.segment"
+msgstr "Segment"
+
+msgid "section.weight_breakdown.col.type"
+msgstr "Type"
+
+msgid "section.weight_breakdown.col.energy"
+msgstr "Energy"
+
+msgid "section.weight_breakdown.col.fraction"
+msgstr "$${W_i/W_{i-1}}$$"
+
+msgid "section.weight_breakdown.col.cumulative"
+msgstr "Cumulative"
+
+msgid "section.weight_breakdown.col.remaining_kg"
+msgstr "Remaining kg"
+
+msgid "section.weight_breakdown.label.mtow"
+msgstr "Maximum Takeoff Weight (MTOW)"
+
+msgid "section.weight_breakdown.label.empty"
+msgstr "Empty Weight"
+
+msgid "section.weight_breakdown.label.payload"
+msgstr "Payload"
+
+msgid "section.weight_breakdown.label.fuel"
+msgstr "Fuel"
+
+msgid "section.weight_breakdown.label.battery"
+msgstr "Battery"
+
+msgid "section.weight_breakdown.label.hybrid_energy"
+msgstr "Fuel + Battery (Hybrid)"
+
+msgid "section.weight_breakdown.kv.cl_star"
+msgstr "$${C_L^{*}}$$ (best L/D lift coefficient)"
+
+msgid "section.weight_breakdown.kv.ld_max"
+msgstr "$${(L/D)_{\\max}}$$"
+
+msgid "section.weight_breakdown.kv.k"
+msgstr "$${k}$$ (induced drag factor)"
+
+msgid "section.weight_breakdown.kv.converged"
+msgstr "Converged"
+
+msgid "section.weight_breakdown.kv.iterations"
+msgstr "Iterations"
+
+# ── Weight equations ───────────────────────────────────────────────────────
+
+msgid "section.weight_equations.title"
+msgstr "Weight Estimation — Equations"
+
+msgid "section.weight_equations.intro"
+msgstr ""
+"The weight estimation follows the mission-fraction method. The MTOW "
+"$${W_{TO}}$$ is found by iterating on the identity below until two "
+"successive estimates agree to within 0.1 g."
+
+msgid "section.weight_equations.intro.with_refs"
+msgstr ""
+"The weight estimation follows the mission-fraction method. The MTOW "
+"$${W_{TO}}$$ is found by iterating on the identity below until two "
+"successive estimates agree to within 0.1 g. Source equations: Sadraey "
+"2020, Sec. 2.6 (mission fractions, Breguet range/endurance, Eq. 2.17-2.18), "
+"Sec. 2.7 (electric energy budget, Eq. 2.25), Sec. 2.4 (aerodynamic efficiency)."
+
+msgid "section.weight_equations.heading.mtow_identity"
+msgstr "1.  MTOW Convergence Identity"
+
+msgid "section.weight_equations.heading.empty_fraction"
+msgstr "2.  Empty-Weight Fraction (Regression)"
+
+msgid "section.weight_equations.heading.mission_fraction"
+msgstr "3.  Mission Weight Fraction"
+
+msgid "section.weight_equations.heading.aero_efficiency"
+msgstr "4.  Aerodynamic Efficiency"
+
+msgid "section.weight_equations.heading.fixed_segments"
+msgstr "5.  Fixed Segment Fractions (Tabulated)"
+
+msgid "section.weight_equations.heading.cruise_breguet"
+msgstr "6a.  Cruise Segment — Breguet Range Equation"
+
+msgid "section.weight_equations.heading.loiter_breguet"
+msgstr "6b.  Loiter Segment — Breguet Endurance Equation"
+
+msgid "section.weight_equations.heading.electric_budget"
+msgstr "6.  Electric Energy Budget"
+
+msgid "section.weight_equations.heading.hybrid"
+msgstr "6c.  Hybrid Propulsion — Mixed Fractions"
+
+msgid "section.weight_equations.empty_intro"
+msgstr ""
+"The empty-weight fraction is obtained from a power-law regression "
+"fitted to the UAV historical database:"
+
+msgid "section.weight_equations.fixed_intro"
+msgstr ""
+"Start, taxi, takeoff, climb, descent, and landing segments use tabulated "
+"fractions (Sadraey Table 2.4). Representative values:"
+
+msgid "section.weight_equations.electric_intro"
+msgstr ""
+"For electric UAVs the weight fraction is replaced by a battery-mass "
+"calculation based on energy consumption:"
+
+msgid "section.weight_equations.hybrid_intro"
+msgstr ""
+"Each segment uses either the Breguet fuel fraction or the electric "
+"energy budget depending on the segment's assigned energy source. The "
+"overall mass budget combines both fuel and battery contributions."
+
+msgid "section.weight_equations.table.fixed_caption"
+msgstr "Sadraey Table 2.4 — fixed-segment weight fractions"
+
+msgid "section.weight_equations.col.typical_fraction"
+msgstr "Typical $${W_i/W_{i-1}}$$"
+
+# Common variable description strings (used in multiple kv lists)
+msgid "var.w_to.full"
+msgstr "Maximum takeoff weight [kg]"
+
+msgid "var.w_payload.full"
+msgstr "Payload mass [kg]"
+
+msgid "var.we_wto"
+msgstr "Empty-weight fraction (from historical regression)"
+
+msgid "var.wf_wto"
+msgstr "Fuel or battery fraction (from mission fractions)"
+
+msgid "var.a_b"
+msgstr "Regression coefficients (propulsion-class specific)"
+
+msgid "var.c_d0"
+msgstr "Zero-lift (parasitic) drag coefficient"
+
+msgid "var.k"
+msgstr "Induced drag factor"
+
+msgid "var.e"
+msgstr "Oswald span efficiency factor"
+
+msgid "var.ar"
+msgstr "Wing aspect ratio"
+
+msgid "var.cl_star"
+msgstr "Lift coefficient at maximum L/D (best-glide speed)"
+
+msgid "var.r_range"
+msgstr "Cruise range [m]"
+
+msgid "var.sfc"
+msgstr "Specific fuel consumption [kg/(N·s)]"
+
+msgid "var.g"
+msgstr "Gravitational acceleration [9.81 m/s²]"
+
+msgid "var.eta_p"
+msgstr "Propulsive efficiency (prop) or 1.0 (jet)"
+
+msgid "var.v_cruise"
+msgstr "Cruise airspeed [m/s]"
+
+msgid "var.l_d"
+msgstr "Lift-to-drag ratio at cruise"
+
+msgid "var.e_endurance"
+msgstr "Loiter endurance [s]"
+
+msgid "var.p_avg"
+msgstr "Average power required [W]"
+
+msgid "var.t_seg"
+msgstr "Duration of segment [s]"
+
+msgid "var.e_total"
+msgstr "Total electrical energy [J]"
+
+msgid "var.eta_bat"
+msgstr "Battery charge/discharge efficiency"
+
+msgid "var.e_bat"
+msgstr "Battery specific energy density [Wh/kg]"
+
+# Fixed segment row labels in Table 2.4
+msgid "wq.fixed.engine_start"
+msgstr "Engine start / warm-up"
+
+msgid "wq.fixed.taxi"
+msgstr "Taxi"
+
+msgid "wq.fixed.takeoff"
+msgstr "Takeoff"
+
+msgid "wq.fixed.climb"
+msgstr "Climb"
+
+msgid "wq.fixed.descent"
+msgstr "Descent"
+
+msgid "wq.fixed.landing"
+msgstr "Landing"
+
+msgid "section.weight_equations.empty_intro_paragraph"
+msgstr ""
+"The empty-weight fraction is obtained from a power-law regression "
+"fitted to the UAV historical database:"
+
+# ── Matching diagram ───────────────────────────────────────────────────────
+
+msgid "section.matching_diagram.title"
+msgstr "Constraint Analysis — Matching Diagram"
+
+msgid "section.matching_diagram.intro_power"
+msgstr ""
+"The matching diagram maps all performance constraints onto a single "
+"plot of Wing Loading $${W/S}$$ versus Power Loading $${W/P}$$. The "
+"feasible design region is bounded by the constraint envelope; the design "
+"point is selected from within this region — ideally at the intersection "
+"that maximises $${W/S}$$ and $${W/P}$$ to minimise wing area and engine "
+"size."
+
+msgid "section.matching_diagram.intro_thrust"
+msgstr ""
+"The matching diagram maps all performance constraints onto a single "
+"plot of Wing Loading $${W/S}$$ versus Thrust-to-Weight $${T/W}$$. The "
+"feasible design region is bounded by the constraint envelope; the design "
+"point is selected from within this region — ideally at the intersection "
+"that maximises $${W/S}$$ and $${T/W}$$ to minimise wing area and engine "
+"size."
+
+msgid "section.matching_diagram.figure_caption"
+msgstr ""
+"Matching diagram — performance constraint boundaries and selected "
+"design point (★)"
+
+msgid "section.matching_diagram.no_diagram_note"
+msgstr "Matching diagram not available — run constraint analysis first."
+
+msgid "section.matching_diagram.heading.boundaries"
+msgstr "Constraint Boundaries"
+
+msgid "section.matching_diagram.heading.coordinates"
+msgstr "Selected Design Point Coordinates"
+
+msgid "section.matching_diagram.stall_limit_paragraph"
+msgstr "Stall limit (vertical line): W/S = {ws:.1f} N/m²"
+
+msgid "section.matching_diagram.table.boundaries_caption"
+msgstr "Active constraint boundaries (Sadraey 2020, Sec. 2.9)"
+
+msgid "section.matching_diagram.col.constraint"
+msgstr "Constraint"
+
+msgid "section.matching_diagram.col.source"
+msgstr "Source"
+
+msgid "section.matching_diagram.label.wing_loading"
+msgstr "Wing Loading $${W/S}$$"
+
+msgid "section.matching_diagram.label.power_loading"
+msgstr "Power Loading $${W/P}$$"
+
+msgid "section.matching_diagram.label.thrust_loading"
+msgstr "Thrust-to-Weight Ratio $${T/W}$$"
+
+# ── Constraint equations ───────────────────────────────────────────────────
+
+msgid "section.constraint_equations.title"
+msgstr "Constraint Analysis — Equations"
+
+msgid "section.constraint_equations.intro"
+msgstr ""
+"All five performance constraints are derived as functions of wing "
+"loading $${W/S}$$ and plotted on the matching diagram. Equation "
+"numbers in parentheses are this report's local references."
+
+msgid "section.constraint_equations.intro.with_refs"
+msgstr ""
+"All five performance constraints are derived as functions of wing "
+"loading $${W/S}$$ and plotted on the matching diagram. Equation "
+"numbers in parentheses are this report's local references; the "
+"underlying derivations follow Sadraey 2020, Sec. 2.9 (textbook Eq. "
+"2.38-2.46 for constraint boundaries and Eq. 2.49-2.51 for wing/engine "
+"sizing)."
+
+msgid "section.constraint_equations.heading.stall"
+msgstr "1. Stall Speed Constraint"
+
+msgid "section.constraint_equations.heading.max_speed"
+msgstr "2. Maximum Level Speed"
+
+msgid "section.constraint_equations.heading.takeoff"
+msgstr "3. Takeoff Ground Roll"
+
+msgid "section.constraint_equations.heading.roc"
+msgstr "4. Rate of Climb"
+
+msgid "section.constraint_equations.heading.ceiling"
+msgstr "5. Service Ceiling"
+
+msgid "section.constraint_equations.heading.wing_engine"
+msgstr "Wing and Engine Sizing"
+
+msgid "section.constraint_equations.max_speed.q_note"
+msgstr ""
+"where the dynamic pressure is "
+"$${q = \\tfrac{1}{2}\\rho_0\\sigma V_{\\max}^{2}}$$."
+
+msgid "section.constraint_equations.ceiling.note"
+msgstr ""
+"At the service ceiling the rate of climb is "
+"$${ROC_C = 0.508\\;\\text{m/s}}$$ (100 ft/min); the density ratio is "
+"$${\\sigma_C = \\rho_{ceiling}/\\rho_{SL}}$$."
 
 # ── Constraint status ──────────────────────────────────────────────────────
 
@@ -85,14 +680,198 @@ msgstr "See matching diagram"
 msgid "section.constraint_status.notes.stall_limit"
 msgstr "W/S limit = {limit:.1f} N/m²"
 
-msgid "status.pass"
-msgstr "PASS"
+# ── Design point summary ───────────────────────────────────────────────────
 
-msgid "status.warn"
-msgstr "WARN"
+msgid "section.design_point_summary.title"
+msgstr "Design Point and Sizing Results"
 
-msgid "status.fail"
-msgstr "FAIL"
+msgid "section.design_point_summary.intro"
+msgstr ""
+"From the selected design point on the matching diagram, the fundamental "
+"aircraft sizing quantities — wing reference area $${S}$$, wingspan "
+"$${b}$$, and required engine power or thrust — are derived using the "
+"following relationships."
+
+msgid "section.design_point_summary.intro.with_refs"
+msgstr ""
+"From the selected design point on the matching diagram, the fundamental "
+"aircraft sizing quantities — wing reference area $${S}$$, wingspan "
+"$${b}$$, and required engine power or thrust — are derived using the "
+"following relationships (Sadraey 2020, Sec. 2.9, Eq. 2.49-2.51)."
+
+msgid "section.design_point_summary.no_dp_note"
+msgstr "Design point not available — run sizing first."
+
+msgid "section.design_point_summary.heading.equations"
+msgstr "Sizing Equations"
+
+msgid "section.design_point_summary.heading.results"
+msgstr "Sizing Results"
+
+msgid "section.design_point_summary.table.caption"
+msgstr "Primary Phase 1 sizing outputs"
+
+msgid "section.design_point_summary.row.mtow"
+msgstr "Max Takeoff Weight (MTOW)"
+
+msgid "section.design_point_summary.row.wing_loading"
+msgstr "Wing Loading $${W/S}$$"
+
+msgid "section.design_point_summary.row.power_loading"
+msgstr "Power Loading $${W/P}$$"
+
+msgid "section.design_point_summary.row.thrust_loading"
+msgstr "Thrust-to-Weight Ratio $${T/W}$$"
+
+msgid "section.design_point_summary.row.wing_area"
+msgstr "Wing Reference Area $${S}$$"
+
+msgid "section.design_point_summary.row.wingspan"
+msgstr "Wingspan $${b}$$"
+
+msgid "section.design_point_summary.row.aspect_ratio"
+msgstr "Aspect Ratio $${AR}$$"
+
+msgid "section.design_point_summary.row.engine_power"
+msgstr "Required Engine Power"
+
+msgid "section.design_point_summary.row.engine_thrust"
+msgstr "Required Engine Thrust"
+
+msgid "dp.var.s"
+msgstr "Wing reference area"
+
+msgid "dp.var.wto"
+msgstr "Maximum takeoff weight (= $${m_{TO}\\cdot g}$$)"
+
+msgid "dp.var.ws_d"
+msgstr "Wing loading at design point"
+
+msgid "dp.var.wp_d"
+msgstr "Power loading at design point"
+
+msgid "dp.var.tw_d"
+msgstr "Thrust-to-weight ratio at design point"
+
+msgid "dp.var.b"
+msgstr "Wingspan"
+
+msgid "dp.var.ar"
+msgstr "Wing aspect ratio"
+
+# ── Aerodynamic parameters ─────────────────────────────────────────────────
+
+msgid "section.aero_params.title"
+msgstr "Aerodynamic Parameters"
+
+msgid "section.aero_params.intro"
+msgstr ""
+"Key aerodynamic parameters derived from the design brief inputs and "
+"used throughout the sizing analysis."
+
+msgid "section.aero_params.engine_intro"
+msgstr "Values from weight estimation engine:"
+
+msgid "ap.row.c_d0"
+msgstr "$${C_{D_0}}$$ (zero-lift drag)"
+
+msgid "ap.row.c_l_max"
+msgstr "$${C_{L_{\\max}}}$$ (max lift coefficient)"
+
+msgid "ap.row.ar"
+msgstr "Aspect Ratio $${AR}$$"
+
+msgid "ap.row.oswald"
+msgstr "Oswald efficiency $${e}$$"
+
+msgid "ap.row.k"
+msgstr "Induced drag factor $${k}$$"
+
+msgid "ap.row.cl_star"
+msgstr "$${C_L^{*}}$$ (best L/D)"
+
+msgid "ap.row.ld_max"
+msgstr "$${(L/D)_{\\max}}$$"
+
+msgid "ap.row.prop_efficiency"
+msgstr "Propeller efficiency $${\\eta_p}$$"
+
+msgid "ap.row.cl_star_engine"
+msgstr "$${C_L^{*}}$$ (from engine)"
+
+msgid "ap.row.ld_max_engine"
+msgstr "$${(L/D)_{\\max}}$$ (from engine)"
+
+# ── Sanity checks ──────────────────────────────────────────────────────────
+
+msgid "section.sanity_checks.title"
+msgstr "Scaling-Law Sanity Checks"
+
+msgid "section.sanity_checks.intro"
+msgstr ""
+"The computed geometry is compared against historical scaling laws "
+"derived from the DSTO UAV database. These checks flag outliers that "
+"may indicate an impractical design."
+
+msgid "section.sanity_checks.no_result_note"
+msgstr "Sanity checks not available — run sizing first."
+
+msgid "section.sanity_checks.disclaimer"
+msgstr ""
+"DSTO scaling-law data is currently limited. Warnings and failures may "
+"reflect sparse historical data rather than a design error."
+
+msgid "section.sanity_checks.table.caption"
+msgstr "Historical scaling-law sanity checks"
+
+msgid "section.sanity_checks.col.computed"
+msgstr "Computed"
+
+msgid "section.sanity_checks.col.expected"
+msgstr "Expected"
+
+msgid "section.sanity_checks.col.band"
+msgstr "Acceptable Band"
+
+# ── Appendix: Inputs ───────────────────────────────────────────────────────
+
+msgid "section.appendix_inputs.title"
+msgstr "Appendix A: Full Input Summary"
+
+msgid "section.appendix_inputs.intro"
+msgstr ""
+"A complete record of all inputs used in this sizing study. Values are "
+"shown in raw SI units."
+
+msgid "section.appendix_inputs.heading.segments"
+msgstr "Mission Segments (Detail)"
+
+msgid "section.appendix_inputs.table.brief_caption"
+msgstr "Complete design brief — raw SI values"
+
+msgid "section.appendix_inputs.table.segments_caption"
+msgstr "Mission segment definitions"
+
+msgid "section.appendix_inputs.col.field"
+msgstr "Field"
+
+msgid "section.appendix_inputs.col.value_si"
+msgstr "Value (SI)"
+
+msgid "section.appendix_inputs.col.unit"
+msgstr "Unit"
+
+msgid "section.appendix_inputs.col.type"
+msgstr "Type"
+
+msgid "section.appendix_inputs.col.enabled"
+msgstr "Enabled"
+
+msgid "section.appendix_inputs.col.energy"
+msgstr "Energy"
+
+msgid "section.appendix_inputs.col.parameters"
+msgstr "Parameters"
 
 # ── Appendix references ────────────────────────────────────────────────────
 
@@ -124,4 +903,4 @@ msgid "section.appendix_references.tooling.note"
 msgstr ""
 "This report was generated by UAV-CD-APP (Python 3.14, PyQt6, pyqtgraph, "
 "numpy, scipy, python-docx, matplotlib). The constraint analysis follows "
-"Sadraey §2.9 exactly; the weight estimation follows §2.6-2.7."
+"Sadraey Sec. 2.9 exactly; the weight estimation follows Sec. 2.6-2.7."

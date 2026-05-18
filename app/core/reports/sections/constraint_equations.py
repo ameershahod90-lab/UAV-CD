@@ -15,39 +15,31 @@ class ConstraintEquationsSection(ReportSection):
         if not ctx.include_equations:
             return
 
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        rb.add_heading(t("section.constraint_equations.title"), level=1)
         is_jet = not ctx.brief.propulsion_type.is_power_mode
 
-        intro = (
-            "All five performance constraints are derived as functions of "
-            "wing loading $${W/S}$$ and plotted on the matching diagram. "
-            "Equation numbers in parentheses are this report's local "
-            "references"
-        )
         if ctx.include_sadraey_refs:
-            intro += (
-                "; the underlying derivations follow Sadraey 2020, Sec. 2.9 "
-                "(textbook Eq. 2.38-2.46 for constraint boundaries and "
-                "Eq. 2.49-2.51 for wing/engine sizing)"
-            )
-        intro += "."
-        rb.add_paragraph(intro)
+            rb.add_paragraph(t("section.constraint_equations.intro.with_refs"))
+        else:
+            rb.add_paragraph(t("section.constraint_equations.intro"))
 
         # Stall
-        rb.add_heading("1. Stall Speed Constraint", level=2)
+        rb.add_heading(t("section.constraint_equations.heading.stall"), level=2)
         rb.add_equation(
             r"(W/S)_{V_s} = \tfrac{1}{2}\,\rho_0\,V_s^{2}\,C_{L_{\max}}"
         )
 
         # Max speed
-        rb.add_heading("2. Maximum Level Speed", level=2)
+        rb.add_heading(
+            t("section.constraint_equations.heading.max_speed"), level=2,
+        )
         if is_jet:
             rb.add_equation(
                 r"T/W = \frac{q\,C_{D_0}}{W/S} + \frac{k(W/S)}{q}"
             )
             rb.add_paragraph(
-                "where the dynamic pressure is "
-                "$${q = \\tfrac{1}{2}\\rho_0\\sigma V_{\\max}^{2}}$$.",
+                t("section.constraint_equations.max_speed.q_note"),
                 italic=True, indent=True,
             )
         else:
@@ -56,7 +48,9 @@ class ConstraintEquationsSection(ReportSection):
             )
 
         # Takeoff
-        rb.add_heading("3. Takeoff Ground Roll", level=2)
+        rb.add_heading(
+            t("section.constraint_equations.heading.takeoff"), level=2,
+        )
         rb.add_equation(
             r"\chi = \exp\!\left(-\frac{0.6\,\rho\,g\,C_{DG}\,S_{TO}}{W/S}\right)"
         )
@@ -71,7 +65,7 @@ class ConstraintEquationsSection(ReportSection):
             )
 
         # Rate of climb
-        rb.add_heading("4. Rate of Climb", level=2)
+        rb.add_heading(t("section.constraint_equations.heading.roc"), level=2)
         if is_jet:
             rb.add_equation(
                 r"T/W = \frac{ROC}{V_{md}} + \frac{1}{(L/D)_{\max}}"
@@ -88,11 +82,11 @@ class ConstraintEquationsSection(ReportSection):
             )
 
         # Ceiling
-        rb.add_heading("5. Service Ceiling", level=2)
+        rb.add_heading(
+            t("section.constraint_equations.heading.ceiling"), level=2,
+        )
         rb.add_paragraph(
-            "At the service ceiling the rate of climb is "
-            "$${ROC_C = 0.508\\;\\text{m/s}}$$ (100 ft/min); the density "
-            "ratio is $${\\sigma_C = \\rho_{ceiling}/\\rho_{SL}}$$.",
+            t("section.constraint_equations.ceiling.note"),
             italic=True, indent=True,
         )
         if is_jet:
@@ -105,7 +99,9 @@ class ConstraintEquationsSection(ReportSection):
             )
 
         # Wing and engine sizing
-        rb.add_heading("Wing and Engine Sizing", level=2)
+        rb.add_heading(
+            t("section.constraint_equations.heading.wing_engine"), level=2,
+        )
         rb.add_equation(r"S_{ref} = \frac{W_{TO}}{(W/S)_{d}}")
         if is_jet:
             rb.add_equation(r"T = (T/W)_{d} \cdot W_{TO}")

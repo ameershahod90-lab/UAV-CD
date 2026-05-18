@@ -12,15 +12,15 @@ class AppendixInputsSection(ReportSection):
     description   = "Complete design brief and segment parameters in one reference table"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
-        rb.add_paragraph(
-            "A complete record of all inputs used in this sizing study.  "
-            "Values are shown in both SI units and the display units configured at export time."
-        )
+        t = ctx.t
+        rb.add_heading(t("section.appendix_inputs.title"), level=1)
+        rb.add_paragraph(t("section.appendix_inputs.intro"))
 
-        b  = ctx.brief
-        dc = ctx.display_converter
+        b = ctx.brief
 
+        # Field names are intentionally code identifiers (snake_case English)
+        # since they correspond to .uavcd file keys. Engineers tracing values
+        # between report and file need them as-is.
         all_rows = [
             ["payload_mass_kg",         f"{b.payload_mass_kg:.4f}",         "kg"],
             ["cruise_speed_ms",         f"{b.cruise_speed_ms:.4f}",         "m/s"],
@@ -48,30 +48,45 @@ class AppendixInputsSection(ReportSection):
                               f"{b.battery_efficiency:.4f}", "—"])
 
         rb.add_table(
-            headers=["Field", "Value (SI)", "Unit"],
+            headers=[
+                t("section.appendix_inputs.col.field"),
+                t("section.appendix_inputs.col.value_si"),
+                t("section.appendix_inputs.col.unit"),
+            ],
             rows=all_rows,
-            caption="Complete design brief — raw SI values",
+            caption=t("section.appendix_inputs.table.brief_caption"),
         )
 
-        # Mission segments
-        rb.add_heading("Mission Segments (Detail)", level=2)
+        # Mission segments — detail listing
+        rb.add_heading(
+            t("section.appendix_inputs.heading.segments"), level=2,
+        )
+        yes = t("common.yes")
+        no  = t("common.no")
+        dash = t("common.dash")
         seg_rows = []
         for i, seg in enumerate(b.mission_segments, 1):
-            params = {}
+            params: dict[str, str] = {}
             if hasattr(seg, "range_km"):
                 params["range_km"] = f"{seg.range_km:.2f} km"
             if hasattr(seg, "endurance_hr"):
                 params["endurance_hr"] = f"{seg.endurance_hr:.3f} hr"
-            param_str = ", ".join(f"{k}={v}" for k, v in params.items()) or "—"
+            param_str = ", ".join(f"{k}={v}" for k, v in params.items()) or dash
             seg_rows.append([
                 str(i),
                 seg.segment_type.name,
-                "Yes" if seg.enabled else "No",
-                seg.energy_source.value if hasattr(seg, "energy_source") else "—",
+                yes if seg.enabled else no,
+                seg.energy_source.value if hasattr(seg, "energy_source") else dash,
                 param_str,
             ])
         rb.add_table(
-            headers=["#", "Type", "Enabled", "Energy", "Parameters"],
+            headers=[
+                "#",
+                t("section.appendix_inputs.col.type"),
+                t("section.appendix_inputs.col.enabled"),
+                t("section.appendix_inputs.col.energy"),
+                t("section.appendix_inputs.col.parameters"),
+            ],
             rows=seg_rows,
-            caption="Mission segment definitions",
+            caption=t("section.appendix_inputs.table.segments_caption"),
         )

@@ -16,29 +16,23 @@ class WeightBreakdownSection(ReportSection):
     )
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        rb.add_heading(t("section.weight_breakdown.title"), level=1)
 
         wr = ctx.weight_result
         if wr is None:
-            rb.add_note(
-                "Weight estimation results not available — run sizing first."
-            )
+            rb.add_note(t("section.weight_breakdown.no_result_note"))
             return
 
         dc  = ctx.display_converter
         b   = ctx.brief
         is_fuel = b.propulsion_type.uses_fuel
-        is_elec = not b.propulsion_type.uses_fuel 
+        is_elec = not b.propulsion_type.uses_fuel
 
-        rb.add_paragraph(
-            "Takeoff weight is estimated using the iterative Breguet "
-            "mission-fraction method (Sadraey 2020, Sec. 2.6-2.7). The "
-            "weight loop converges when successive MTOW estimates differ by "
-            "less than 0.1 g."
-        )
+        rb.add_paragraph(t("section.weight_breakdown.intro"))
 
         # ── Top-level weight summary ──────────────────────────────────────
-        rb.add_heading("Mass Summary", level=2)
+        rb.add_heading(t("section.weight_breakdown.heading.mass_summary"), level=2)
 
         wto_v, wto_u = dc.mass(wr.w_to_kg)
         we_v,  we_u  = dc.mass(wr.w_empty_kg)
@@ -49,42 +43,50 @@ class WeightBreakdownSection(ReportSection):
         pct_payload = wr.w_payload_kg        / wr.w_to_kg * 100 if wr.w_to_kg else 0
         pct_fb      = wr.w_fuel_or_battery_kg/ wr.w_to_kg * 100 if wr.w_to_kg else 0
 
-        energy_label = (
-            "Fuel" if is_fuel
-            else "Battery" if is_elec
-            else "Fuel/Battery (Hybrid)"
-        )
+        if is_fuel and not is_elec:
+            energy_label = t("section.weight_breakdown.label.fuel")
+        elif is_elec and not is_fuel:
+            energy_label = t("section.weight_breakdown.label.battery")
+        else:
+            energy_label = t("section.weight_breakdown.label.hybrid_energy")
 
         summary_rows = [
-            ["Maximum Takeoff Weight (MTOW)", f"{wto_v:.3f} {wto_u}", f"{100:.1f} %"],
-            ["Empty Weight",                  f"{we_v:.3f} {we_u}",  f"{pct_empty:.1f} %"],
-            ["Payload",                       f"{wp_v:.3f} {wp_u}",  f"{pct_payload:.1f} %"],
-            [energy_label,                    f"{wfb_v:.3f} {wfb_u}", f"{pct_fb:.1f} %"],
+            [t("section.weight_breakdown.label.mtow"),
+             f"{wto_v:.3f} {wto_u}", f"{100:.1f} %"],
+            [t("section.weight_breakdown.label.empty"),
+             f"{we_v:.3f} {we_u}",  f"{pct_empty:.1f} %"],
+            [t("section.weight_breakdown.label.payload"),
+             f"{wp_v:.3f} {wp_u}",  f"{pct_payload:.1f} %"],
+            [energy_label,
+             f"{wfb_v:.3f} {wfb_u}", f"{pct_fb:.1f} %"],
         ]
 
         rb.add_table(
-            headers=["Component", "Mass", "% MTOW"],
+            headers=[
+                t("section.weight_breakdown.col.component"),
+                t("section.weight_breakdown.col.mass"),
+                t("section.weight_breakdown.col.pct_mtow"),
+            ],
             rows=summary_rows,
-            caption="UAV mass breakdown",
+            caption=t("section.weight_breakdown.table.summary_caption"),
         )
 
         # ── Key aerodynamic readouts ──────────────────────────────────────
         k = 1.0 / (math.pi * b.oswald_efficiency * b.aspect_ratio)
         rb.add_key_value_list([
-            ("CL* (best L/D CL)",    f"{wr.cl_cruise:.4f}"),
-            ("(L/D)max",             f"{wr.ld_max:.2f}"),
-            ("k (induced drag factor)", f"{k:.5f}"),
-            ("Converged",            "Yes" if wr.converged else "No"),
-            ("Iterations",           str(wr.iterations)),
+            (t("section.weight_breakdown.kv.cl_star"),  f"{wr.cl_cruise:.4f}"),
+            (t("section.weight_breakdown.kv.ld_max"),   f"{wr.ld_max:.2f}"),
+            (t("section.weight_breakdown.kv.k"),        f"{k:.5f}"),
+            (t("section.weight_breakdown.kv.converged"),
+             t("common.yes") if wr.converged else t("common.no")),
+            (t("section.weight_breakdown.kv.iterations"), str(wr.iterations)),
         ])
 
         # ── Per-segment weight fractions ──────────────────────────────────
-        rb.add_heading("Segment Weight Fractions", level=2)
-        rb.add_paragraph(
-            "Each segment reduces the aircraft weight by its fraction "
-            "$${W_i/W_{i-1}}$$. The product of all fractions gives the overall "
-            "mission weight fraction (Sadraey 2020, Sec. 2.6, Table 2.4)."
+        rb.add_heading(
+            t("section.weight_breakdown.heading.segment_fractions"), level=2,
         )
+        rb.add_paragraph(t("section.weight_breakdown.segments_intro"))
 
         seg_rows = []
         cumulative = 1.0
@@ -100,16 +102,22 @@ class WeightBreakdownSection(ReportSection):
             ])
 
         rb.add_table(
-            headers=["Segment", "Type", "Energy", "Wi/Wi-1",
-                     "Cumulative", "Remaining kg"],
+            headers=[
+                t("section.weight_breakdown.col.segment"),
+                t("section.weight_breakdown.col.type"),
+                t("section.weight_breakdown.col.energy"),
+                t("section.weight_breakdown.col.fraction"),
+                t("section.weight_breakdown.col.cumulative"),
+                t("section.weight_breakdown.col.remaining_kg"),
+            ],
             rows=seg_rows,
-            caption="Per-segment weight fractions and cumulative mass",
+            caption=t("section.weight_breakdown.table.fractions_caption"),
         )
 
         # ── Pie chart ─────────────────────────────────────────────────────
         if ctx.weight_pie_chart_png:
             rb.add_figure(
                 ctx.weight_pie_chart_png,
-                caption="Weight component distribution",
+                caption=t("section.weight_breakdown.figure_caption"),
                 width_cm=10.0,
             )

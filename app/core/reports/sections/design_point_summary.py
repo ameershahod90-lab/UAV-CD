@@ -12,21 +12,17 @@ class DesignPointSummarySection(ReportSection):
     description   = "Final sizing: MTOW, wing area, wingspan, engine power/thrust"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
-        intro = (
-            "From the selected design point on the matching diagram, the "
-            "fundamental aircraft sizing quantities — wing reference area "
-            "$${S}$$, wingspan $${b}$$, and required engine power or thrust "
-            "— are derived using the following relationships"
-        )
+        t = ctx.t
+        rb.add_heading(t("section.design_point_summary.title"), level=1)
+
         if ctx.include_sadraey_refs:
-            intro += " (Sadraey 2020, Sec. 2.9, Eq. 2.49-2.51)"
-        intro += "."
-        rb.add_paragraph(intro)
+            rb.add_paragraph(t("section.design_point_summary.intro.with_refs"))
+        else:
+            rb.add_paragraph(t("section.design_point_summary.intro"))
 
         dp = ctx.design_point
         if dp is None:
-            rb.add_note("Design point not available — run sizing first.")
+            rb.add_note(t("section.design_point_summary.no_dp_note"))
             return
 
         cr = ctx.constraint_result
@@ -35,7 +31,9 @@ class DesignPointSummarySection(ReportSection):
 
         # Equations — only the one relevant to the propulsion loading mode
         if ctx.include_equations:
-            rb.add_heading("Sizing Equations", level=2)
+            rb.add_heading(
+                t("section.design_point_summary.heading.equations"), level=2,
+            )
             rb.add_equation(r"S = \frac{W_{TO}}{(W/S)_{d}}")
             if is_power:
                 rb.add_equation(r"P = \frac{W_{TO}}{(W/P)_{d}}")
@@ -43,24 +41,27 @@ class DesignPointSummarySection(ReportSection):
                 rb.add_equation(r"T = (T/W)_{d} \cdot W_{TO}")
             rb.add_equation(r"b = \sqrt{AR \cdot S}")
 
-            # Variable definitions — show only the loading row that applies
+            # Variable definitions — labels stay as math IDs ($${...}$$),
+            # descriptions translate.
             var_defs: list[tuple[str, str]] = [
-                ("S",       "Wing reference area"),
-                ("W_TO",    "Maximum takeoff weight (= m_TO · g)"),
-                ("(W/S)_d", "Wing loading at design point"),
+                ("$${S}$$",       t("dp.var.s")),
+                ("$${W_{TO}}$$",  t("dp.var.wto")),
+                ("$${(W/S)_d}$$", t("dp.var.ws_d")),
             ]
             if is_power:
-                var_defs.append(("(W/P)_d", "Power loading at design point"))
+                var_defs.append(("$${(W/P)_d}$$", t("dp.var.wp_d")))
             else:
-                var_defs.append(("(T/W)_d", "Thrust-to-weight ratio at design point"))
+                var_defs.append(("$${(T/W)_d}$$", t("dp.var.tw_d")))
             var_defs.extend([
-                ("b",  "Wingspan"),
-                ("AR", "Wing aspect ratio"),
+                ("$${b}$$",  t("dp.var.b")),
+                ("$${AR}$$", t("dp.var.ar")),
             ])
             rb.add_key_value_list(var_defs)
 
-        # Results table — values in user's display units; no SI / alternative column
-        rb.add_heading("Sizing Results", level=2)
+        # Results table — values in user's display units
+        rb.add_heading(
+            t("section.design_point_summary.heading.results"), level=2,
+        )
 
         wto_v, wto_u = dc.mass(dp.w_to_kg)
         ws_v,  ws_u  = dc.wing_loading(dp.wing_loading_nm2)
@@ -68,27 +69,32 @@ class DesignPointSummarySection(ReportSection):
         b_v,   b_u   = dc.length(dp.wingspan_m)
 
         if is_power:
-            ld_v, ld_u = dc.power_loading(dp.power_loading_nw)
-            ld_label   = "Power Loading (W/P)"
-            pwr_v, pwr_u = dc.power(dp.engine_power_w)
-            pwr_label  = "Required Engine Power"
+            ld_v, ld_u     = dc.power_loading(dp.power_loading_nw)
+            ld_label       = t("section.design_point_summary.row.power_loading")
+            pwr_v, pwr_u   = dc.power(dp.engine_power_w)
+            pwr_label      = t("section.design_point_summary.row.engine_power")
         else:
-            ld_v, ld_u = dc.force_loading(dp.power_loading_nw)
-            ld_label   = "Thrust-to-Weight Ratio (T/W)"
-            pwr_v, pwr_u = dc.force(dp.engine_power_w)
-            pwr_label  = "Required Engine Thrust"
+            ld_v, ld_u     = dc.force_loading(dp.power_loading_nw)
+            ld_label       = t("section.design_point_summary.row.thrust_loading")
+            pwr_v, pwr_u   = dc.force(dp.engine_power_w)
+            pwr_label      = t("section.design_point_summary.row.engine_thrust")
 
         rows = [
-            ["Max Takeoff Weight (MTOW)", f"{wto_v:.3f} {wto_u}"],
-            ["Wing Loading (W/S)",        f"{ws_v:.2f} {ws_u}"],
-            [ld_label,                    f"{ld_v:.5f} {ld_u}"],
-            ["Wing Reference Area (S)",   f"{s_v:.4f} {s_u}"],
-            ["Wingspan (b)",              f"{b_v:.3f} {b_u}"],
-            ["Aspect Ratio (AR)",         f"{dp.aspect_ratio:.2f}"],
-            [pwr_label,                   f"{pwr_v:.2f} {pwr_u}"],
+            [t("section.design_point_summary.row.mtow"),
+             f"{wto_v:.3f} {wto_u}"],
+            [t("section.design_point_summary.row.wing_loading"),
+             f"{ws_v:.2f} {ws_u}"],
+            [ld_label,                       f"{ld_v:.5f} {ld_u}"],
+            [t("section.design_point_summary.row.wing_area"),
+             f"{s_v:.4f} {s_u}"],
+            [t("section.design_point_summary.row.wingspan"),
+             f"{b_v:.3f} {b_u}"],
+            [t("section.design_point_summary.row.aspect_ratio"),
+             f"{dp.aspect_ratio:.2f}"],
+            [pwr_label,                      f"{pwr_v:.2f} {pwr_u}"],
         ]
         rb.add_table(
-            headers=["Parameter", "Value"],
+            headers=[t("col.parameter"), t("col.value")],
             rows=rows,
-            caption="Primary Phase 1 sizing outputs",
+            caption=t("section.design_point_summary.table.caption"),
         )

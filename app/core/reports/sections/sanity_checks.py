@@ -13,42 +13,45 @@ class SanityChecksSection(ReportSection):
     description   = "Historical scaling-law comparison (wingspan, wing area, etc.)"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
-        rb.add_paragraph(
-            "The computed geometry is compared against historical scaling laws "
-            "derived from the DSTO UAV database.  These checks flag outliers "
-            "that may indicate an impractical design."
-        )
+        t = ctx.t
+        rb.add_heading(t("section.sanity_checks.title"), level=1)
+        rb.add_paragraph(t("section.sanity_checks.intro"))
 
         dp = ctx.design_point
         if dp is None or not dp.sanity_checks:
-            rb.add_note("Sanity checks not available — run sizing first.")
+            rb.add_note(t("section.sanity_checks.no_result_note"))
             return
 
-        _ICONS = {
-            SanityCheckStatus.PASS:    "✓  PASS",
-            SanityCheckStatus.WARN: "⚠  WARN",
-            SanityCheckStatus.FAIL:    "✗  FAIL",
+        # Status labels translate per language; the icon (✓/⚠/✗) stays the same.
+        icons = {
+            SanityCheckStatus.PASS: t("status.icon_pass"),
+            SanityCheckStatus.WARN: t("status.icon_warn"),
+            SanityCheckStatus.FAIL: t("status.icon_fail"),
         }
 
         rows = []
         for sc in dp.sanity_checks:
+            # parameter_name is a domain identifier produced by the engine —
+            # carried through unchanged until/unless we add catalogue entries
+            # for each scaling-law variable.
             rows.append([
                 sc.parameter_name,
                 f"{sc.computed_value:.3f} {sc.unit}",
                 f"{sc.expected_value:.3f} {sc.unit}",
                 f"{sc.band_low:.3f} – {sc.band_high:.3f}",
-                _ICONS.get(sc.status, "?"),
+                icons.get(sc.status, "?"),
             ])
 
         rb.add_table(
-            headers=["Parameter", "Computed", "Expected", "Acceptable Band", "Status"],
+            headers=[
+                t("col.parameter"),
+                t("section.sanity_checks.col.computed"),
+                t("section.sanity_checks.col.expected"),
+                t("section.sanity_checks.col.band"),
+                t("col.status"),
+            ],
             rows=rows,
-            caption="Historical scaling-law sanity checks",
+            caption=t("section.sanity_checks.table.caption"),
         )
 
-        rb.add_note(
-            "DSTO scaling law data is currently limited. "
-            "Warnings and failures may reflect sparse historical data "
-            "rather than a design error."
-        )
+        rb.add_note(t("section.sanity_checks.disclaimer"))

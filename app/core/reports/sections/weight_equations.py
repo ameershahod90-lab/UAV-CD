@@ -26,50 +26,42 @@ class WeightEquationsSection(ReportSection):
         if not ctx.include_equations:
             return
 
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        rb.add_heading(t("section.weight_equations.title"), level=1)
 
-        intro = (
-            "The weight estimation follows the mission-fraction method. The "
-            "MTOW $${W_{TO}}$$ is found by iterating on the identity below "
-            "until two successive estimates agree to within 0.1 g"
-        )
         if ctx.include_sadraey_refs:
-            intro += (
-                ". Source equations: Sadraey 2020, Sec. 2.6 (mission "
-                "fractions and Breguet range/endurance, Eq. 2.17-2.18), "
-                "Sec. 2.7 (electric energy budget, Eq. 2.25), and Sec. 2.4 "
-                "(aerodynamic efficiency)"
-            )
-        intro += "."
-        rb.add_paragraph(intro)
+            rb.add_paragraph(t("section.weight_equations.intro.with_refs"))
+        else:
+            rb.add_paragraph(t("section.weight_equations.intro"))
 
         b = ctx.brief
 
         # ── MTOW convergence loop ─────────────────────────────────────────
-        rb.add_heading("1.  MTOW Convergence Identity", level=2)
+        rb.add_heading(
+            t("section.weight_equations.heading.mtow_identity"), level=2,
+        )
         rb.add_equation(
             r"W_{TO} = \frac{W_{payload}}{1 - W_E/W_{TO} - W_F/W_{TO}}"
         )
         rb.add_key_value_list([
-            ("$${W_{TO}}$$",       "Maximum takeoff weight [kg]"),
-            ("$${W_{payload}}$$",  "Payload mass [kg]"),
-            ("$${W_E / W_{TO}}$$", "Empty-weight fraction (from historical regression)"),
-            ("$${W_F / W_{TO}}$$", "Fuel or battery fraction (from mission fractions)"),
+            ("$${W_{TO}}$$",       t("var.w_to.full")),
+            ("$${W_{payload}}$$",  t("var.w_payload.full")),
+            ("$${W_E / W_{TO}}$$", t("var.we_wto")),
+            ("$${W_F / W_{TO}}$$", t("var.wf_wto")),
         ])
 
         # ── Empty weight fraction ─────────────────────────────────────────
-        rb.add_heading("2.  Empty-Weight Fraction (Regression)", level=2)
-        rb.add_paragraph(
-            "The empty-weight fraction is obtained from a power-law "
-            "regression fitted to the UAV historical database:"
+        rb.add_heading(
+            t("section.weight_equations.heading.empty_fraction"), level=2,
         )
+        rb.add_paragraph(t("section.weight_equations.empty_intro"))
         rb.add_equation(r"\frac{W_E}{W_{TO}} = a \cdot W_{TO}^{\,b}")
-        rb.add_key_value_list([
-            ("$${a, b}$$", "Regression coefficients (propulsion-class specific)"),
-        ])
+        rb.add_key_value_list([("$${a, b}$$", t("var.a_b"))])
 
         # ── Mission fraction product ──────────────────────────────────────
-        rb.add_heading("3.  Mission Weight Fraction", level=2)
+        rb.add_heading(
+            t("section.weight_equations.heading.mission_fraction"), level=2,
+        )
         rb.add_equation(
             r"\frac{W_{final}}{W_{initial}} = \prod_{i} \frac{W_i}{W_{i-1}}"
         )
@@ -78,35 +70,39 @@ class WeightEquationsSection(ReportSection):
         )
 
         # ── Maximum aerodynamic efficiency ────────────────────────────────
-        rb.add_heading("4.  Aerodynamic Efficiency", level=2)
+        rb.add_heading(
+            t("section.weight_equations.heading.aero_efficiency"), level=2,
+        )
         rb.add_equation(r"k = \frac{1}{\pi\,e\,AR}")
         rb.add_equation(r"C_L^{*} = \sqrt{\frac{C_{D_0}}{k}}")
         rb.add_equation(r"(L/D)_{\max} = \frac{1}{2\sqrt{C_{D_0}\,k}}")
         rb.add_key_value_list([
-            ("$${C_{D_0}}$$",      "Zero-lift (parasitic) drag coefficient"),
-            ("$${k}$$",            "Induced drag factor"),
-            ("$${e}$$",            "Oswald span efficiency factor"),
-            ("$${AR}$$",           "Wing aspect ratio"),
-            ("$${C_L^{*}}$$",      "Lift coefficient at maximum L/D (best-glide speed)"),
+            ("$${C_{D_0}}$$",  t("var.c_d0")),
+            ("$${k}$$",        t("var.k")),
+            ("$${e}$$",        t("var.e")),
+            ("$${AR}$$",       t("var.ar")),
+            ("$${C_L^{*}}$$",  t("var.cl_star")),
         ])
 
         # ── Fixed segments ────────────────────────────────────────────────
-        rb.add_heading("5.  Fixed Segment Fractions (Tabulated)", level=2)
-        rb.add_paragraph(
-            "Start, taxi, takeoff, climb, descent, and landing segments use "
-            "tabulated fractions (Sadraey Table 2.4). Representative values:"
+        rb.add_heading(
+            t("section.weight_equations.heading.fixed_segments"), level=2,
         )
+        rb.add_paragraph(t("section.weight_equations.fixed_intro"))
         rb.add_table(
-            headers=["Segment", "Typical $${W_i/W_{i-1}}$$"],
-            rows=[
-                ["Engine start / warm-up", "0.990"],
-                ["Taxi",                   "0.990"],
-                ["Takeoff",                "0.995"],
-                ["Climb",                  "0.980"],
-                ["Descent",                "0.990"],
-                ["Landing",                "0.995"],
+            headers=[
+                t("section.weight_breakdown.col.segment"),
+                t("section.weight_equations.col.typical_fraction"),
             ],
-            caption="Sadraey Table 2.4 — fixed-segment weight fractions",
+            rows=[
+                [t("wq.fixed.engine_start"), "0.990"],
+                [t("wq.fixed.taxi"),         "0.990"],
+                [t("wq.fixed.takeoff"),      "0.995"],
+                [t("wq.fixed.climb"),        "0.980"],
+                [t("wq.fixed.descent"),      "0.990"],
+                [t("wq.fixed.landing"),      "0.995"],
+            ],
+            caption=t("section.weight_equations.table.fixed_caption"),
         )
 
         is_fuel = b.propulsion_type.uses_fuel
@@ -114,33 +110,34 @@ class WeightEquationsSection(ReportSection):
 
         if is_fuel:
             # Fuel-based propulsion
-            rb.add_heading("6a.  Cruise Segment — Breguet Range Equation", level=2)
+            rb.add_heading(
+                t("section.weight_equations.heading.cruise_breguet"), level=2,
+            )
             rb.add_equation(
                 r"\frac{W_i}{W_{i-1}} = \exp\!\left(-\frac{R \cdot SFC \cdot g}{\eta_p \cdot V \cdot (L/D)}\right)"
             )
             rb.add_key_value_list([
-                ("$${R}$$",      "Cruise range [m]"),
-                ("$${SFC}$$",    "Specific fuel consumption [kg/(N·s)]"),
-                ("$${g}$$",      "Gravitational acceleration [9.81 m/s²]"),
-                ("$${\\eta_p}$$", "Propulsive efficiency (prop) or 1.0 (jet)"),
-                ("$${V}$$",      "Cruise airspeed [m/s]"),
-                ("$${L/D}$$",    "Lift-to-drag ratio at cruise"),
+                ("$${R}$$",       t("var.r_range")),
+                ("$${SFC}$$",     t("var.sfc")),
+                ("$${g}$$",       t("var.g")),
+                ("$${\\eta_p}$$", t("var.eta_p")),
+                ("$${V}$$",       t("var.v_cruise")),
+                ("$${L/D}$$",     t("var.l_d")),
             ])
 
-            rb.add_heading("6b.  Loiter Segment — Breguet Endurance Equation", level=2)
+            rb.add_heading(
+                t("section.weight_equations.heading.loiter_breguet"), level=2,
+            )
             rb.add_equation(
                 r"\frac{W_i}{W_{i-1}} = \exp\!\left(-\frac{E \cdot SFC \cdot g}{\eta_p \cdot (L/D)}\right)"
             )
-            rb.add_key_value_list([
-                ("$${E}$$", "Loiter endurance [s]"),
-            ])
+            rb.add_key_value_list([("$${E}$$", t("var.e_endurance"))])
 
         if is_elec:
-            rb.add_heading("6.  Electric Energy Budget", level=2)
-            rb.add_paragraph(
-                "For electric UAVs the weight fraction is replaced by a "
-                "battery-mass calculation based on energy consumption:"
+            rb.add_heading(
+                t("section.weight_equations.heading.electric_budget"), level=2,
             )
+            rb.add_paragraph(t("section.weight_equations.electric_intro"))
             rb.add_equation(
                 r"P_{avg} = \frac{W_{TO} \cdot g}{\eta_p \cdot (L/D)} \cdot V"
             )
@@ -150,18 +147,15 @@ class WeightEquationsSection(ReportSection):
                 r"W_{battery} = \frac{E_{total}}{\eta_{bat} \cdot e_{bat} \cdot 3600}"
             )
             rb.add_key_value_list([
-                ("$${P_{avg}}$$",   "Average power required [W]"),
-                ("$${t_{seg}}$$",   "Duration of segment [s]"),
-                ("$${E_{total}}$$", "Total electrical energy [J]"),
-                ("$${\\eta_{bat}}$$", "Battery charge/discharge efficiency"),
-                ("$${e_{bat}}$$",   "Battery specific energy density [Wh/kg]"),
+                ("$${P_{avg}}$$",      t("var.p_avg")),
+                ("$${t_{seg}}$$",      t("var.t_seg")),
+                ("$${E_{total}}$$",    t("var.e_total")),
+                ("$${\\eta_{bat}}$$",  t("var.eta_bat")),
+                ("$${e_{bat}}$$",      t("var.e_bat")),
             ])
 
         if b.propulsion_type is PropulsionType.HYBRID:
-            rb.add_heading("6c.  Hybrid Propulsion — Mixed Fractions", level=2)
-            rb.add_paragraph(
-                "Each segment uses either the Breguet fuel fraction or the "
-                "electric energy budget depending on the segment's assigned "
-                "energy source. The overall mass budget combines both fuel "
-                "and battery contributions."
+            rb.add_heading(
+                t("section.weight_equations.heading.hybrid"), level=2,
             )
+            rb.add_paragraph(t("section.weight_equations.hybrid_intro"))

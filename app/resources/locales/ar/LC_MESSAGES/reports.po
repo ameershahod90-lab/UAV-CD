@@ -1,7 +1,8 @@
 # Arabic translations for UAV-CD-APP report export.
-# Variable names (W_{TO}, η_p, etc.), equation labels, section numbers,
-# unit symbols, and citation IDs remain in Latin script / Western numerals
-# — they are universal across languages in technical writing.
+# Variable names ($${W_{TO}}$$, $${\eta_p}$$, etc.), equation labels, section
+# numbers, unit symbols (kg, m, m²), and citation IDs remain in Latin script
+# / Western numerals — they are universal across languages in technical
+# engineering writing.
 msgid ""
 msgstr ""
 "Project-Id-Version: UAV-CD-APP 1.0\n"
@@ -10,6 +11,63 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+# ── Common labels ─────────────────────────────────────────────────────────
+
+msgid "common.dash"
+msgstr "—"
+
+msgid "common.yes"
+msgstr "نعم"
+
+msgid "common.no"
+msgstr "لا"
+
+msgid "common.fixed_fraction"
+msgstr "كسر ثابت"
+
+msgid "common.see_diagram"
+msgstr "راجع مخطط المطابقة"
+
+# ── Status labels ─────────────────────────────────────────────────────────
+
+msgid "status.pass"
+msgstr "ناجح"
+
+msgid "status.warn"
+msgstr "تحذير"
+
+msgid "status.fail"
+msgstr "فاشل"
+
+msgid "status.icon_pass"
+msgstr "✓  ناجح"
+
+msgid "status.icon_warn"
+msgstr "⚠  تحذير"
+
+msgid "status.icon_fail"
+msgstr "✗  فاشل"
+
+# ── Common column headers ─────────────────────────────────────────────────
+
+msgid "col.parameter"
+msgstr "المعامل"
+
+msgid "col.value"
+msgstr "القيمة"
+
+msgid "col.description"
+msgstr "الوصف"
+
+msgid "col.status"
+msgstr "الحالة"
+
+msgid "col.notes"
+msgstr "ملاحظات"
+
+msgid "col.unit"
+msgstr "الوحدة"
 
 # ── Cover page ─────────────────────────────────────────────────────────────
 
@@ -33,6 +91,529 @@ msgstr ""
 "تم إنشاء هذا التقرير آلياً بواسطة تطبيق UAV-CD-APP لتصميم الطائرات بدون "
 "طيار. جميع الحسابات الهندسية تتبع مرجع: "
 "Sadraey (2020), Design of Unmanned Aerial Systems."
+
+# ── Mission requirements ───────────────────────────────────────────────────
+
+msgid "section.mission_requirements.title"
+msgstr "متطلبات المهمة"
+
+msgid "section.mission_requirements.intro"
+msgstr ""
+"تشكل متطلبات المهمة التالية الأساس الذي تُبنى عليه دراسة التصميم. "
+"جميع الحسابات تُنفَّذ بوحدات النظام الدولي SI."
+
+msgid "section.mission_requirements.heading.segments"
+msgstr "مراحل المهمة"
+
+msgid "section.mission_requirements.table.brief_caption"
+msgstr "متطلبات تصميم المهمة والمعاملات الديناميكية الهوائية"
+
+msgid "section.mission_requirements.table.segments_caption"
+msgstr "ملف مراحل المهمة"
+
+msgid "section.mission_requirements.col.segment_type"
+msgstr "نوع المرحلة"
+
+msgid "section.mission_requirements.col.enabled"
+msgstr "مُفعَّلة"
+
+msgid "section.mission_requirements.col.energy_source"
+msgstr "مصدر الطاقة"
+
+msgid "section.mission_requirements.col.parameters"
+msgstr "البارامترات"
+
+msgid "section.mission_requirements.kv.total_range"
+msgstr "إجمالي المدى من مراحل الطيران المستمر المُفعَّلة"
+
+msgid "section.mission_requirements.kv.total_endurance"
+msgstr "إجمالي الزمن من مراحل التحويم المُفعَّلة"
+
+msgid "mr.row.payload_mass"
+msgstr "كتلة الحمولة النافعة"
+
+msgid "mr.row.cruise_speed"
+msgstr "سرعة الطيران المستمر"
+
+msgid "mr.row.stall_speed"
+msgstr "سرعة الانهيار (Stall)"
+
+msgid "mr.row.max_speed"
+msgstr "السرعة القصوى"
+
+msgid "mr.row.rate_of_climb"
+msgstr "معدل الصعود"
+
+msgid "mr.row.cruise_altitude"
+msgstr "ارتفاع الطيران المستمر"
+
+msgid "mr.row.service_ceiling"
+msgstr "السقف التشغيلي"
+
+msgid "mr.row.takeoff_run"
+msgstr "مسافة الإقلاع الأرضية"
+
+msgid "mr.row.propulsion_type"
+msgstr "نوع الدفع"
+
+msgid "mr.row.aspect_ratio"
+msgstr "النسبة الباعية $${AR}$$"
+
+msgid "mr.row.c_d0"
+msgstr "$${C_{D_0}}$$"
+
+msgid "mr.row.c_l_max"
+msgstr "$${C_{L_{\\max}}}$$"
+
+msgid "mr.row.oswald"
+msgstr "كفاءة أوزوالد $${e}$$"
+
+msgid "mr.row.prop_efficiency"
+msgstr "كفاءة الدفع $${\\eta_p}$$"
+
+msgid "mr.row.sfc"
+msgstr "الاستهلاك النوعي للوقود (SFC)"
+
+msgid "mr.row.battery_energy_density"
+msgstr "كثافة طاقة البطارية"
+
+msgid "mr.row.battery_efficiency"
+msgstr "كفاءة البطارية"
+
+msgid "mr.desc.payload_mass"
+msgstr "الحمولة النافعة المُصمَّم لها"
+
+msgid "mr.desc.cruise_speed"
+msgstr "سرعة الطيران المستمر الاسمية"
+
+msgid "mr.desc.stall_speed"
+msgstr "أدنى سرعة طيران آمنة"
+
+msgid "mr.desc.max_speed"
+msgstr "السرعة الأفقية القصوى"
+
+msgid "mr.desc.rate_of_climb"
+msgstr "معدل الصعود عند مستوى سطح البحر"
+
+msgid "mr.desc.cruise_altitude"
+msgstr "ارتفاع الطيران المستمر الاسمي"
+
+msgid "mr.desc.service_ceiling"
+msgstr "أقصى ارتفاع (ROC = 0.508 m/s)"
+
+msgid "mr.desc.takeoff_run"
+msgstr "مسافة الإقلاع على الأرض"
+
+msgid "mr.desc.propulsion_type"
+msgstr "فئة نظام الدفع"
+
+msgid "mr.desc.aspect_ratio"
+msgstr "النسبة الباعية للجناح"
+
+msgid "mr.desc.c_d0"
+msgstr "معامل سحب الرفع الصفري"
+
+msgid "mr.desc.c_l_max"
+msgstr "أقصى معامل رفع"
+
+msgid "mr.desc.oswald"
+msgstr "معامل كفاءة الامتداد"
+
+msgid "mr.desc.prop_efficiency"
+msgstr "كفاءة الدفع (للمراوح، أو 1.0 للنفاثات)"
+
+msgid "mr.desc.sfc"
+msgstr "الاستهلاك النوعي للوقود"
+
+msgid "mr.desc.battery_energy_density"
+msgstr "الطاقة النوعية لخلية بطارية ليثيوم-بوليمر"
+
+msgid "mr.desc.battery_efficiency"
+msgstr "كفاءة الشحن/التفريغ للبطارية"
+
+msgid "mr.params.cruise_range"
+msgstr "المدى: {range_km:.1f} km"
+
+msgid "mr.params.loiter_endurance"
+msgstr "الزمن: {endurance_hr:.2f} hr"
+
+# ── Mission profile ────────────────────────────────────────────────────────
+
+msgid "section.mission_profile.title"
+msgstr "ملف المهمة"
+
+msgid "section.mission_profile.intro"
+msgstr ""
+"يُحدِّد ملف المهمة تسلسل مراحل الطيران من الإقلاع وحتى الهبوط. تساهم كل "
+"مرحلة في إجمالي كسر الوزن وميزانية الطاقة للطائرة."
+
+msgid "section.mission_profile.figure_caption"
+msgstr "ملف الارتفاع للمهمة — الارتفاع مقابل المدى/الزمن التراكمي"
+
+msgid "section.mission_profile.no_diagram_note"
+msgstr "مخطط ملف المهمة غير متوفر — يرجى تشغيل عملية التصميم أولاً."
+
+msgid "section.mission_profile.methodology"
+msgstr ""
+"تتبع منهجية التصميم مرجع Sadraey 2020، القسم 2.6-2.7، حيث تساهم كل مرحلة "
+"بكسر وزن $${W_i/W_{i-1}}$$ في بناء الوزن الإجمالي عند الإقلاع. تستخدم "
+"المراحل الثابتة كسور وزن مُجدوَلة (الجدول 2.4)؛ بينما تستخدم مراحل الطيران "
+"المستمر والتحويم معادلات Breguet للمدى والزمن."
+
+# ── Weight breakdown ───────────────────────────────────────────────────────
+
+msgid "section.weight_breakdown.title"
+msgstr "تقدير الوزن"
+
+msgid "section.weight_breakdown.no_result_note"
+msgstr "نتائج تقدير الوزن غير متوفرة — يرجى تشغيل عملية التصميم أولاً."
+
+msgid "section.weight_breakdown.intro"
+msgstr ""
+"يُقدَّر وزن الإقلاع باستخدام طريقة كسور المهمة التكرارية لبريغيت "
+"(Sadraey 2020، القسم 2.6-2.7). تتقارب حلقة الوزن عندما يختلف تقدير "
+"وزن الإقلاع MTOW المتتالي بأقل من 0.1 g."
+
+msgid "section.weight_breakdown.heading.mass_summary"
+msgstr "ملخص الكتل"
+
+msgid "section.weight_breakdown.heading.segment_fractions"
+msgstr "كسور وزن المراحل"
+
+msgid "section.weight_breakdown.segments_intro"
+msgstr ""
+"تُقلِّل كل مرحلة وزن الطائرة بكسرها $${W_i/W_{i-1}}$$. حاصل ضرب جميع "
+"الكسور يعطي كسر وزن المهمة الإجمالي (Sadraey 2020، القسم 2.6، الجدول 2.4)."
+
+msgid "section.weight_breakdown.table.summary_caption"
+msgstr "توزيع كتل الطائرة بدون طيار"
+
+msgid "section.weight_breakdown.table.fractions_caption"
+msgstr "كسور الوزن لكل مرحلة والكتلة التراكمية"
+
+msgid "section.weight_breakdown.figure_caption"
+msgstr "توزيع مكونات الوزن"
+
+msgid "section.weight_breakdown.col.component"
+msgstr "المكوّن"
+
+msgid "section.weight_breakdown.col.mass"
+msgstr "الكتلة"
+
+msgid "section.weight_breakdown.col.pct_mtow"
+msgstr "% من MTOW"
+
+msgid "section.weight_breakdown.col.segment"
+msgstr "المرحلة"
+
+msgid "section.weight_breakdown.col.type"
+msgstr "النوع"
+
+msgid "section.weight_breakdown.col.energy"
+msgstr "الطاقة"
+
+msgid "section.weight_breakdown.col.fraction"
+msgstr "$${W_i/W_{i-1}}$$"
+
+msgid "section.weight_breakdown.col.cumulative"
+msgstr "التراكمي"
+
+msgid "section.weight_breakdown.col.remaining_kg"
+msgstr "المتبقي [kg]"
+
+msgid "section.weight_breakdown.label.mtow"
+msgstr "أقصى وزن للإقلاع (MTOW)"
+
+msgid "section.weight_breakdown.label.empty"
+msgstr "الوزن الفارغ"
+
+msgid "section.weight_breakdown.label.payload"
+msgstr "الحمولة النافعة"
+
+msgid "section.weight_breakdown.label.fuel"
+msgstr "الوقود"
+
+msgid "section.weight_breakdown.label.battery"
+msgstr "البطارية"
+
+msgid "section.weight_breakdown.label.hybrid_energy"
+msgstr "وقود + بطارية (هجين)"
+
+msgid "section.weight_breakdown.kv.cl_star"
+msgstr "$${C_L^{*}}$$ (معامل رفع أفضل L/D)"
+
+msgid "section.weight_breakdown.kv.ld_max"
+msgstr "$${(L/D)_{\\max}}$$"
+
+msgid "section.weight_breakdown.kv.k"
+msgstr "$${k}$$ (معامل السحب المستحث)"
+
+msgid "section.weight_breakdown.kv.converged"
+msgstr "تقاربَت الحلقة"
+
+msgid "section.weight_breakdown.kv.iterations"
+msgstr "عدد التكرارات"
+
+# ── Weight equations ───────────────────────────────────────────────────────
+
+msgid "section.weight_equations.title"
+msgstr "تقدير الوزن — المعادلات"
+
+msgid "section.weight_equations.intro"
+msgstr ""
+"يتبع تقدير الوزن طريقة كسور المهمة. يُحسب وزن الإقلاع $${W_{TO}}$$ بتكرار "
+"المعادلة الأساسية أدناه إلى أن يتفق تقديران متتاليان بفارق أقل من 0.1 g."
+
+msgid "section.weight_equations.intro.with_refs"
+msgstr ""
+"يتبع تقدير الوزن طريقة كسور المهمة. يُحسب وزن الإقلاع $${W_{TO}}$$ بتكرار "
+"المعادلة الأساسية أدناه إلى أن يتفق تقديران متتاليان بفارق أقل من 0.1 g. "
+"المعادلات الأصلية: Sadraey 2020، القسم 2.6 (كسور المهمة ومعادلات Breguet "
+"للمدى والزمن، Eq. 2.17-2.18)، القسم 2.7 (ميزانية الطاقة للمحركات الكهربائية، "
+"Eq. 2.25)، القسم 2.4 (الكفاءة الديناميكية الهوائية)."
+
+msgid "section.weight_equations.heading.mtow_identity"
+msgstr "1. متطابقة تقارب وزن الإقلاع MTOW"
+
+msgid "section.weight_equations.heading.empty_fraction"
+msgstr "2. كسر الوزن الفارغ (انحدار إحصائي)"
+
+msgid "section.weight_equations.heading.mission_fraction"
+msgstr "3. كسر وزن المهمة"
+
+msgid "section.weight_equations.heading.aero_efficiency"
+msgstr "4. الكفاءة الديناميكية الهوائية"
+
+msgid "section.weight_equations.heading.fixed_segments"
+msgstr "5. كسور المراحل الثابتة (مُجدوَلة)"
+
+msgid "section.weight_equations.heading.cruise_breguet"
+msgstr "6أ. مرحلة الطيران المستمر — معادلة Breguet للمدى"
+
+msgid "section.weight_equations.heading.loiter_breguet"
+msgstr "6ب. مرحلة التحويم — معادلة Breguet للزمن"
+
+msgid "section.weight_equations.heading.electric_budget"
+msgstr "6. ميزانية الطاقة الكهربائية"
+
+msgid "section.weight_equations.heading.hybrid"
+msgstr "6ج. الدفع الهجين — كسور مختلطة"
+
+msgid "section.weight_equations.empty_intro"
+msgstr ""
+"يُستخرَج كسر الوزن الفارغ من انحدار قانون قوة مُلائَم على قاعدة بيانات "
+"الطائرات بدون طيار التاريخية:"
+
+msgid "section.weight_equations.fixed_intro"
+msgstr ""
+"تستخدم مراحل بدء التشغيل والاستعداد، والإقلاع، والصعود، والهبوط، "
+"والملامسة الأرضية كسور وزن مُجدوَلة (Sadraey الجدول 2.4). قيم تمثيلية:"
+
+msgid "section.weight_equations.electric_intro"
+msgstr ""
+"بالنسبة للطائرات الكهربائية يُستبدَل كسر الوزن بحساب كتلة البطارية اعتماداً "
+"على استهلاك الطاقة:"
+
+msgid "section.weight_equations.hybrid_intro"
+msgstr ""
+"تستخدم كل مرحلة إمّا كسر وقود Breguet أو ميزانية الطاقة الكهربائية، وفقاً "
+"لمصدر الطاقة المُسنَد للمرحلة. ميزانية الكتلة الإجمالية تجمع بين مساهمات "
+"الوقود والبطارية."
+
+msgid "section.weight_equations.table.fixed_caption"
+msgstr "Sadraey الجدول 2.4 — كسور وزن المراحل الثابتة"
+
+msgid "section.weight_equations.col.typical_fraction"
+msgstr "القيمة النموذجية $${W_i/W_{i-1}}$$"
+
+msgid "var.w_to.full"
+msgstr "أقصى وزن للإقلاع [kg]"
+
+msgid "var.w_payload.full"
+msgstr "كتلة الحمولة النافعة [kg]"
+
+msgid "var.we_wto"
+msgstr "كسر الوزن الفارغ (من الانحدار الإحصائي التاريخي)"
+
+msgid "var.wf_wto"
+msgstr "كسر الوقود أو البطارية (من كسور المهمة)"
+
+msgid "var.a_b"
+msgstr "معاملات الانحدار (خاصة بفئة نظام الدفع)"
+
+msgid "var.c_d0"
+msgstr "معامل سحب الرفع الصفري (طفيلي)"
+
+msgid "var.k"
+msgstr "معامل السحب المستحث"
+
+msgid "var.e"
+msgstr "معامل كفاءة الامتداد لأوزوالد"
+
+msgid "var.ar"
+msgstr "النسبة الباعية للجناح"
+
+msgid "var.cl_star"
+msgstr "معامل الرفع عند أقصى L/D (سرعة أفضل انزلاق)"
+
+msgid "var.r_range"
+msgstr "مدى الطيران المستمر [m]"
+
+msgid "var.sfc"
+msgstr "الاستهلاك النوعي للوقود [kg/(N·s)]"
+
+msgid "var.g"
+msgstr "تسارع الجاذبية الأرضية [9.81 m/s²]"
+
+msgid "var.eta_p"
+msgstr "كفاءة الدفع (للمراوح، أو 1.0 للنفاثات)"
+
+msgid "var.v_cruise"
+msgstr "سرعة الطيران المستمر [m/s]"
+
+msgid "var.l_d"
+msgstr "نسبة الرفع إلى السحب أثناء الطيران المستمر"
+
+msgid "var.e_endurance"
+msgstr "زمن التحويم [s]"
+
+msgid "var.p_avg"
+msgstr "القدرة المتوسطة المطلوبة [W]"
+
+msgid "var.t_seg"
+msgstr "مدة المرحلة [s]"
+
+msgid "var.e_total"
+msgstr "إجمالي الطاقة الكهربائية [J]"
+
+msgid "var.eta_bat"
+msgstr "كفاءة شحن/تفريغ البطارية"
+
+msgid "var.e_bat"
+msgstr "كثافة الطاقة النوعية للبطارية [Wh/kg]"
+
+msgid "wq.fixed.engine_start"
+msgstr "بدء التشغيل / الإحماء"
+
+msgid "wq.fixed.taxi"
+msgstr "التحرك على الأرض"
+
+msgid "wq.fixed.takeoff"
+msgstr "الإقلاع"
+
+msgid "wq.fixed.climb"
+msgstr "الصعود"
+
+msgid "wq.fixed.descent"
+msgstr "الانخفاض"
+
+msgid "wq.fixed.landing"
+msgstr "الهبوط"
+
+msgid "section.weight_equations.empty_intro_paragraph"
+msgstr ""
+"يُستخرَج كسر الوزن الفارغ من انحدار قانون قوة مُلائَم على قاعدة بيانات "
+"الطائرات بدون طيار التاريخية:"
+
+# ── Matching diagram ───────────────────────────────────────────────────────
+
+msgid "section.matching_diagram.title"
+msgstr "تحليل القيود — مخطط المطابقة"
+
+msgid "section.matching_diagram.intro_power"
+msgstr ""
+"يُعِدّ مخطط المطابقة جميع قيود الأداء على رسم بياني واحد يربط بين حمل "
+"الجناح $${W/S}$$ وحمل القدرة $${W/P}$$. تحدد المنطقة المسموح بها بظرف "
+"القيود؛ تُختار نقطة التصميم من داخل هذه المنطقة — يُفضَّل عند التقاطع "
+"الذي يعظِّم $${W/S}$$ و $${W/P}$$ لتقليل مساحة الجناح وحجم المحرك."
+
+msgid "section.matching_diagram.intro_thrust"
+msgstr ""
+"يُعِدّ مخطط المطابقة جميع قيود الأداء على رسم بياني واحد يربط بين حمل "
+"الجناح $${W/S}$$ ونسبة الدفع إلى الوزن $${T/W}$$. تحدد المنطقة المسموح "
+"بها بظرف القيود؛ تُختار نقطة التصميم من داخل هذه المنطقة — يُفضَّل عند "
+"التقاطع الذي يعظِّم $${W/S}$$ و $${T/W}$$ لتقليل مساحة الجناح وحجم "
+"المحرك."
+
+msgid "section.matching_diagram.figure_caption"
+msgstr ""
+"مخطط المطابقة — حدود قيود الأداء ونقطة التصميم المختارة (★)"
+
+msgid "section.matching_diagram.no_diagram_note"
+msgstr "مخطط المطابقة غير متوفر — يرجى تشغيل تحليل القيود أولاً."
+
+msgid "section.matching_diagram.heading.boundaries"
+msgstr "حدود القيود"
+
+msgid "section.matching_diagram.heading.coordinates"
+msgstr "إحداثيات نقطة التصميم المختارة"
+
+msgid "section.matching_diagram.stall_limit_paragraph"
+msgstr "حد الانهيار (خط رأسي): W/S = {ws:.1f} N/m²"
+
+msgid "section.matching_diagram.table.boundaries_caption"
+msgstr "حدود القيود الفعّالة (Sadraey 2020، القسم 2.9)"
+
+msgid "section.matching_diagram.col.constraint"
+msgstr "القيد"
+
+msgid "section.matching_diagram.col.source"
+msgstr "المصدر"
+
+msgid "section.matching_diagram.label.wing_loading"
+msgstr "حمل الجناح $${W/S}$$"
+
+msgid "section.matching_diagram.label.power_loading"
+msgstr "حمل القدرة $${W/P}$$"
+
+msgid "section.matching_diagram.label.thrust_loading"
+msgstr "نسبة الدفع إلى الوزن $${T/W}$$"
+
+# ── Constraint equations ───────────────────────────────────────────────────
+
+msgid "section.constraint_equations.title"
+msgstr "تحليل القيود — المعادلات"
+
+msgid "section.constraint_equations.intro"
+msgstr ""
+"تُشتَقّ قيود الأداء الخمسة كدوالّ في حمل الجناح $${W/S}$$ وتُرسَم على مخطط "
+"المطابقة. أرقام المعادلات بين قوسين هي مراجع داخلية لهذا التقرير."
+
+msgid "section.constraint_equations.intro.with_refs"
+msgstr ""
+"تُشتَقّ قيود الأداء الخمسة كدوالّ في حمل الجناح $${W/S}$$ وتُرسَم على مخطط "
+"المطابقة. أرقام المعادلات بين قوسين هي مراجع داخلية لهذا التقرير؛ الاشتقاقات "
+"الأصلية تتبع Sadraey 2020، القسم 2.9 (المعادلات 2.38-2.46 لحدود القيود، "
+"والمعادلات 2.49-2.51 لحساب الجناح والمحرك)."
+
+msgid "section.constraint_equations.heading.stall"
+msgstr "1. قيد سرعة الانهيار"
+
+msgid "section.constraint_equations.heading.max_speed"
+msgstr "2. السرعة الأفقية القصوى"
+
+msgid "section.constraint_equations.heading.takeoff"
+msgstr "3. مسافة الإقلاع الأرضية"
+
+msgid "section.constraint_equations.heading.roc"
+msgstr "4. معدل الصعود"
+
+msgid "section.constraint_equations.heading.ceiling"
+msgstr "5. السقف التشغيلي"
+
+msgid "section.constraint_equations.heading.wing_engine"
+msgstr "حساب الجناح والمحرك"
+
+msgid "section.constraint_equations.max_speed.q_note"
+msgstr ""
+"حيث الضغط الديناميكي يساوي "
+"$${q = \\tfrac{1}{2}\\rho_0\\sigma V_{\\max}^{2}}$$."
+
+msgid "section.constraint_equations.ceiling.note"
+msgstr ""
+"عند السقف التشغيلي يكون معدل الصعود "
+"$${ROC_C = 0.508\\;\\text{m/s}}$$ (100 ft/min)؛ ونسبة الكثافة هي "
+"$${\\sigma_C = \\rho_{ceiling}/\\rho_{SL}}$$."
 
 # ── Constraint status ──────────────────────────────────────────────────────
 
@@ -84,14 +665,197 @@ msgstr "راجع مخطط المطابقة"
 msgid "section.constraint_status.notes.stall_limit"
 msgstr "حد W/S = {limit:.1f} N/m²"
 
-msgid "status.pass"
-msgstr "ناجح"
+# ── Design point summary ───────────────────────────────────────────────────
 
-msgid "status.warn"
-msgstr "تحذير"
+msgid "section.design_point_summary.title"
+msgstr "نقطة التصميم ونتائج الأبعاد"
 
-msgid "status.fail"
-msgstr "فاشل"
+msgid "section.design_point_summary.intro"
+msgstr ""
+"انطلاقاً من نقطة التصميم المختارة على مخطط المطابقة، تُشتَقّ كميات الأبعاد "
+"الأساسية للطائرة — مساحة الجناح المرجعية $${S}$$ والباع $${b}$$ والقدرة "
+"أو الدفع المطلوب من المحرك — باستخدام العلاقات التالية."
+
+msgid "section.design_point_summary.intro.with_refs"
+msgstr ""
+"انطلاقاً من نقطة التصميم المختارة على مخطط المطابقة، تُشتَقّ كميات الأبعاد "
+"الأساسية للطائرة — مساحة الجناح المرجعية $${S}$$ والباع $${b}$$ والقدرة "
+"أو الدفع المطلوب من المحرك — باستخدام العلاقات التالية (Sadraey 2020، "
+"القسم 2.9، Eq. 2.49-2.51)."
+
+msgid "section.design_point_summary.no_dp_note"
+msgstr "نقطة التصميم غير متوفرة — يرجى تشغيل عملية التصميم أولاً."
+
+msgid "section.design_point_summary.heading.equations"
+msgstr "معادلات الأبعاد"
+
+msgid "section.design_point_summary.heading.results"
+msgstr "نتائج الأبعاد"
+
+msgid "section.design_point_summary.table.caption"
+msgstr "نتائج أبعاد المرحلة الأولى الرئيسية"
+
+msgid "section.design_point_summary.row.mtow"
+msgstr "أقصى وزن للإقلاع (MTOW)"
+
+msgid "section.design_point_summary.row.wing_loading"
+msgstr "حمل الجناح $${W/S}$$"
+
+msgid "section.design_point_summary.row.power_loading"
+msgstr "حمل القدرة $${W/P}$$"
+
+msgid "section.design_point_summary.row.thrust_loading"
+msgstr "نسبة الدفع إلى الوزن $${T/W}$$"
+
+msgid "section.design_point_summary.row.wing_area"
+msgstr "مساحة الجناح المرجعية $${S}$$"
+
+msgid "section.design_point_summary.row.wingspan"
+msgstr "الباع $${b}$$"
+
+msgid "section.design_point_summary.row.aspect_ratio"
+msgstr "النسبة الباعية $${AR}$$"
+
+msgid "section.design_point_summary.row.engine_power"
+msgstr "القدرة المطلوبة من المحرك"
+
+msgid "section.design_point_summary.row.engine_thrust"
+msgstr "الدفع المطلوب من المحرك"
+
+msgid "dp.var.s"
+msgstr "مساحة الجناح المرجعية"
+
+msgid "dp.var.wto"
+msgstr "أقصى وزن للإقلاع (= $${m_{TO}\\cdot g}$$)"
+
+msgid "dp.var.ws_d"
+msgstr "حمل الجناح عند نقطة التصميم"
+
+msgid "dp.var.wp_d"
+msgstr "حمل القدرة عند نقطة التصميم"
+
+msgid "dp.var.tw_d"
+msgstr "نسبة الدفع إلى الوزن عند نقطة التصميم"
+
+msgid "dp.var.b"
+msgstr "الباع"
+
+msgid "dp.var.ar"
+msgstr "النسبة الباعية للجناح"
+
+# ── Aerodynamic parameters ─────────────────────────────────────────────────
+
+msgid "section.aero_params.title"
+msgstr "المعاملات الديناميكية الهوائية"
+
+msgid "section.aero_params.intro"
+msgstr ""
+"المعاملات الديناميكية الهوائية الرئيسية المُشتقَّة من مدخلات وثيقة "
+"التصميم والمُستخدَمة في كامل تحليل الأبعاد."
+
+msgid "section.aero_params.engine_intro"
+msgstr "قيم مأخوذة من محرك تقدير الوزن:"
+
+msgid "ap.row.c_d0"
+msgstr "$${C_{D_0}}$$ (سحب الرفع الصفري)"
+
+msgid "ap.row.c_l_max"
+msgstr "$${C_{L_{\\max}}}$$ (أقصى معامل رفع)"
+
+msgid "ap.row.ar"
+msgstr "النسبة الباعية $${AR}$$"
+
+msgid "ap.row.oswald"
+msgstr "كفاءة أوزوالد $${e}$$"
+
+msgid "ap.row.k"
+msgstr "معامل السحب المستحث $${k}$$"
+
+msgid "ap.row.cl_star"
+msgstr "$${C_L^{*}}$$ (سرعة أفضل L/D)"
+
+msgid "ap.row.ld_max"
+msgstr "$${(L/D)_{\\max}}$$"
+
+msgid "ap.row.prop_efficiency"
+msgstr "كفاءة المروحة $${\\eta_p}$$"
+
+msgid "ap.row.cl_star_engine"
+msgstr "$${C_L^{*}}$$ (من المحرك الحسابي)"
+
+msgid "ap.row.ld_max_engine"
+msgstr "$${(L/D)_{\\max}}$$ (من المحرك الحسابي)"
+
+# ── Sanity checks ──────────────────────────────────────────────────────────
+
+msgid "section.sanity_checks.title"
+msgstr "فحوصات قوانين القياس التاريخية"
+
+msgid "section.sanity_checks.intro"
+msgstr ""
+"تُقارَن الأبعاد المحسوبة مع قوانين القياس التاريخية المستمدّة من قاعدة "
+"بيانات DSTO للطائرات بدون طيار. تكشف هذه الفحوصات عن الانحرافات التي "
+"قد تشير إلى تصميم غير عملي."
+
+msgid "section.sanity_checks.no_result_note"
+msgstr "فحوصات قوانين القياس غير متوفرة — يرجى تشغيل عملية التصميم أولاً."
+
+msgid "section.sanity_checks.disclaimer"
+msgstr ""
+"بيانات قوانين القياس من DSTO محدودة في الوقت الراهن. قد تعكس التحذيرات "
+"وحالات الفشل قلة البيانات التاريخية لا خطأً في التصميم."
+
+msgid "section.sanity_checks.table.caption"
+msgstr "فحوصات قوانين القياس التاريخية"
+
+msgid "section.sanity_checks.col.computed"
+msgstr "القيمة المحسوبة"
+
+msgid "section.sanity_checks.col.expected"
+msgstr "القيمة المتوقعة"
+
+msgid "section.sanity_checks.col.band"
+msgstr "النطاق المقبول"
+
+# ── Appendix: Inputs ───────────────────────────────────────────────────────
+
+msgid "section.appendix_inputs.title"
+msgstr "الملحق أ: ملخص المدخلات الكامل"
+
+msgid "section.appendix_inputs.intro"
+msgstr ""
+"سجل كامل لجميع المدخلات المُستخدَمة في دراسة الأبعاد. تُعرَض القيم بوحدات "
+"النظام الدولي SI."
+
+msgid "section.appendix_inputs.heading.segments"
+msgstr "مراحل المهمة (التفصيل)"
+
+msgid "section.appendix_inputs.table.brief_caption"
+msgstr "وثيقة التصميم الكاملة — قيم SI الخام"
+
+msgid "section.appendix_inputs.table.segments_caption"
+msgstr "تعريفات مراحل المهمة"
+
+msgid "section.appendix_inputs.col.field"
+msgstr "الحقل"
+
+msgid "section.appendix_inputs.col.value_si"
+msgstr "القيمة (SI)"
+
+msgid "section.appendix_inputs.col.unit"
+msgstr "الوحدة"
+
+msgid "section.appendix_inputs.col.type"
+msgstr "النوع"
+
+msgid "section.appendix_inputs.col.enabled"
+msgstr "مُفعَّلة"
+
+msgid "section.appendix_inputs.col.energy"
+msgstr "الطاقة"
+
+msgid "section.appendix_inputs.col.parameters"
+msgstr "البارامترات"
 
 # ── Appendix references ────────────────────────────────────────────────────
 

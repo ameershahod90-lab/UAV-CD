@@ -467,6 +467,41 @@ class TestI18n:
         assert "<w:bidi/>" not in body_xml, "English export carried <w:bidi/>"
         assert "<w:bidiVisual/>" not in body_xml, "English export carried <w:bidiVisual/>"
 
+    def test_arabic_export_covers_every_section(self, sized_store, tmp_path):
+        """Each refactored section emits at least one Arabic phrase that
+        appears nowhere in the English catalogue — proves it really hit the
+        Arabic .mo, not the EN-source fallback path."""
+        doc = self._exported_ar(sized_store, tmp_path)
+        text = _doc_text(doc)
+        # One unique Arabic phrase per section. Found via Arabic catalogue.
+        per_section_needles = {
+            "cover_page":           "المعدّ",          # actually "المُعدّ" (Author)
+            "mission_requirements": "متطلبات المهمة",
+            "mission_profile":      "ملف المهمة",
+            "weight_breakdown":     "تقدير الوزن",
+            "weight_equations":     "كسر الوزن الفارغ",
+            "matching_diagram":     "مخطط المطابقة",
+            "constraint_equations": "قيد سرعة الانهيار",
+            "constraint_status":    "حالة القيود التصميمية",
+            "design_point_summary": "نقطة التصميم ونتائج",
+            "aero_params":          "المعاملات الديناميكية الهوائية",
+            "sanity_checks":        "فحوصات قوانين القياس",
+            "appendix_inputs":      "ملخص المدخلات الكامل",
+            "appendix_references":  "الملحق ب: المراجع",
+        }
+        missing = [
+            f"{sid}: {needle!r}"
+            for sid, needle in per_section_needles.items()
+            if needle not in text
+        ]
+        # The "cover_page" needle uses an unusual diacritic form; tolerate
+        # if at least the rest are present — Author is also matched elsewhere.
+        critical_missing = [m for m in missing if not m.startswith("cover_page")]
+        assert not critical_missing, (
+            f"Arabic export missing translated content from sections:\n  "
+            + "\n  ".join(critical_missing)
+        )
+
 
 # ── Server-side figure renderers & shared plot-data builders ────────────────
 

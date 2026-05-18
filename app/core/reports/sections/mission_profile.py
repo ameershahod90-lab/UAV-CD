@@ -12,26 +12,17 @@ class MissionProfileSection(ReportSection):
     description   = "Mission altitude profile diagram and segment timeline"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
-        rb.add_paragraph(
-            "The mission profile defines the sequence of flight phases from "
-            "takeoff to landing.  Each segment contributes to the total weight "
-            "fraction and energy budget of the aircraft."
-        )
+        t = ctx.t
+        rb.add_heading(t("section.mission_profile.title"), level=1)
+        rb.add_paragraph(t("section.mission_profile.intro"))
 
         if ctx.mission_profile_png:
             rb.add_figure(
                 ctx.mission_profile_png,
-                caption="Mission altitude profile — altitude vs. cumulative range/time",
+                caption=t("section.mission_profile.figure_caption"),
                 width_cm=15.0,
             )
         else:
-            rb.add_note("Mission profile diagram not available — run sizing first.")
+            rb.add_note(t("section.mission_profile.no_diagram_note"))
 
-        rb.add_paragraph(
-            "The sizing methodology follows Sadraey 2020, Sec. 2.6-2.7, where "
-            "each segment contributes a weight fraction $${W_i/W_{i-1}}$$ to the "
-            "overall MTOW buildup. Fixed segments use tabulated fractions "
-            "(Table 2.4); cruise and loiter segments use the Breguet "
-            "range/endurance equations."
-        )
+        rb.add_paragraph(t("section.mission_profile.methodology"))

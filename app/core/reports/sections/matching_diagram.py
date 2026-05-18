@@ -15,62 +15,61 @@ class MatchingDiagramSection(ReportSection):
     )
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        rb.add_heading(t("section.matching_diagram.title"), level=1)
 
         cr = ctx.constraint_result
         dp = ctx.design_point
         dc = ctx.display_converter
         is_power = cr.is_power_loading_mode if cr else True
-        loading_axis = "Power Loading (W/P)" if is_power else "Thrust-to-Weight (T/W)"
-        loading_short = "W/P" if is_power else "T/W"
 
-        rb.add_paragraph(
-            f"The matching diagram maps all performance constraints onto a "
-            f"single plot of Wing Loading (W/S) versus {loading_axis}. "
-            f"The feasible design region is bounded by the constraint "
-            f"envelope; the design point is selected from within this region — "
-            f"ideally at the intersection that maximises W/S and {loading_short} "
-            f"to minimise wing area and engine size."
-        )
+        # Propulsion-mode-specific intro paragraph (different translation
+        # keys for the power-loading vs thrust-loading variants).
+        if is_power:
+            rb.add_paragraph(t("section.matching_diagram.intro_power"))
+        else:
+            rb.add_paragraph(t("section.matching_diagram.intro_thrust"))
 
         if ctx.matching_diagram_png:
             rb.add_figure(
                 ctx.matching_diagram_png,
-                caption="Matching diagram — performance constraint boundaries "
-                        "and selected design point (★)",
+                caption=t("section.matching_diagram.figure_caption"),
                 width_cm=15.0,
             )
         else:
-            rb.add_note(
-                "Matching diagram not available — run constraint analysis first."
-            )
+            rb.add_note(t("section.matching_diagram.no_diagram_note"))
 
         if cr is not None:
-            rb.add_heading("Constraint Boundaries", level=2)
+            rb.add_heading(t("section.matching_diagram.heading.boundaries"), level=2)
             rb.add_paragraph(
-                f"Stall limit (vertical line): W/S = "
-                f"{cr.stall_ws_nm2:.1f} N/m²"
+                t("section.matching_diagram.stall_limit_paragraph",
+                  ws=cr.stall_ws_nm2)
             )
-            rows = []
-            for curve in cr.curves:
-                rows.append([curve.name, "See matching diagram"])
+            see_diagram = t("common.see_diagram")
+            rows = [[curve.name, see_diagram] for curve in cr.curves]
             rb.add_table(
-                headers=["Constraint", "Source"],
+                headers=[
+                    t("section.matching_diagram.col.constraint"),
+                    t("section.matching_diagram.col.source"),
+                ],
                 rows=rows,
-                caption="Active constraint boundaries (Sadraey 2020, Sec. 2.9)",
+                caption=t("section.matching_diagram.table.boundaries_caption"),
             )
 
         if dp is not None:
-            rb.add_heading("Selected Design Point Coordinates", level=2)
+            rb.add_heading(
+                t("section.matching_diagram.heading.coordinates"), level=2,
+            )
             ws_v, ws_u = dc.wing_loading(dp.wing_loading_nm2)
             if is_power:
                 ld_v, ld_u = dc.power_loading(dp.power_loading_nw)
-                ld_label = "Power Loading (W/P)"
+                ld_label = t("section.matching_diagram.label.power_loading")
             else:
                 ld_v, ld_u = dc.force_loading(dp.power_loading_nw)
-                ld_label = "Thrust-to-Weight Ratio (T/W)"
+                ld_label = t("section.matching_diagram.label.thrust_loading")
 
             rb.add_key_value_list([
-                ("Wing Loading (W/S)", f"{ws_v:.2f} {ws_u}"),
-                (ld_label,             f"{ld_v:.5f} {ld_u}"),
+                (t("section.matching_diagram.label.wing_loading"),
+                 f"{ws_v:.2f} {ws_u}"),
+                (ld_label, f"{ld_v:.5f} {ld_u}"),
             ])

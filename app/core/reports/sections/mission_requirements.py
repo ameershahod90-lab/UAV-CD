@@ -13,70 +13,86 @@ class MissionRequirementsSection(ReportSection):
     description   = "All design brief inputs formatted as a requirements table"
 
     def build(self, ctx: ReportContext, rb: ReportBuilder) -> None:
-        rb.add_heading(self.title, level=1)
-        rb.add_paragraph(
-            "The following mission requirements form the basis of the sizing study. "
-            "All calculations are performed in SI units."
-        )
+        t = ctx.t
+        rb.add_heading(t("section.mission_requirements.title"), level=1)
+        rb.add_paragraph(t("section.mission_requirements.intro"))
 
         b = ctx.brief
 
+        # Row labels and descriptions translate; values/units stay numeric/SI.
         rows = [
-            ["Payload Mass",          f"{b.payload_mass_kg:.3f} kg",   "Design payload"],
-            ["Cruise Speed",          f"{b.cruise_speed_ms:.1f} m/s",  "Nominal cruise airspeed"],
-            ["Stall Speed",           f"{b.stall_speed_ms:.1f} m/s",   "Minimum safe speed"],
-            ["Max Speed",             f"{b.max_speed_ms:.1f} m/s",     "Maximum level speed"],
-            ["Rate of Climb",         f"{b.rate_of_climb_ms:.2f} m/s", "Climb rate at SL"],
-            ["Cruise Altitude",       f"{b.cruise_altitude_m:.0f} m",  "Nominal altitude"],
-            ["Service Ceiling",       f"{b.service_ceiling_m:.0f} m",  "Max altitude (ROC = 0.508 m/s)"],
-            ["Takeoff Run",           f"{b.takeoff_run_m:.0f} m",      "Ground roll distance"],
-            ["Propulsion Type",       b.propulsion_type.label,          "Propulsion category"],
-            ["Aspect Ratio (AR)",     f"{b.aspect_ratio:.2f}",          "Wing aspect ratio"],
-            ["CD0",                   f"{b.c_d0:.4f}",                  "Zero-lift drag coefficient"],
-            ["CLmax",                 f"{b.c_l_max:.2f}",               "Maximum lift coefficient"],
-            ["Oswald Efficiency (e)", f"{b.oswald_efficiency:.3f}",     "Span efficiency"],
-            ["Prop. Efficiency (eta_p)", f"{b.prop_efficiency:.2f}",   "Propulsive efficiency"],
+            [t("mr.row.payload_mass"),    f"{b.payload_mass_kg:.3f} kg",   t("mr.desc.payload_mass")],
+            [t("mr.row.cruise_speed"),    f"{b.cruise_speed_ms:.1f} m/s",  t("mr.desc.cruise_speed")],
+            [t("mr.row.stall_speed"),     f"{b.stall_speed_ms:.1f} m/s",   t("mr.desc.stall_speed")],
+            [t("mr.row.max_speed"),       f"{b.max_speed_ms:.1f} m/s",     t("mr.desc.max_speed")],
+            [t("mr.row.rate_of_climb"),   f"{b.rate_of_climb_ms:.2f} m/s", t("mr.desc.rate_of_climb")],
+            [t("mr.row.cruise_altitude"), f"{b.cruise_altitude_m:.0f} m",  t("mr.desc.cruise_altitude")],
+            [t("mr.row.service_ceiling"), f"{b.service_ceiling_m:.0f} m",  t("mr.desc.service_ceiling")],
+            [t("mr.row.takeoff_run"),     f"{b.takeoff_run_m:.0f} m",      t("mr.desc.takeoff_run")],
+            [t("mr.row.propulsion_type"), b.propulsion_type.label,         t("mr.desc.propulsion_type")],
+            [t("mr.row.aspect_ratio"),    f"{b.aspect_ratio:.2f}",         t("mr.desc.aspect_ratio")],
+            [t("mr.row.c_d0"),            f"{b.c_d0:.4f}",                 t("mr.desc.c_d0")],
+            [t("mr.row.c_l_max"),         f"{b.c_l_max:.2f}",              t("mr.desc.c_l_max")],
+            [t("mr.row.oswald"),          f"{b.oswald_efficiency:.3f}",    t("mr.desc.oswald")],
+            [t("mr.row.prop_efficiency"), f"{b.prop_efficiency:.2f}",      t("mr.desc.prop_efficiency")],
         ]
 
-        # Propulsion-specific fields
+        # Propulsion-specific rows
         if b.propulsion_type.uses_fuel:
-            rows.append(["SFC", f"{b.specific_fuel_consumption_g_wh:.4f} g/(W·h)", "Specific fuel consumption"])
+            rows.append([
+                t("mr.row.sfc"),
+                f"{b.specific_fuel_consumption_g_wh:.4f} g/(W·h)",
+                t("mr.desc.sfc"),
+            ])
         if not b.propulsion_type.uses_fuel:
-            rows.append(["Battery Energy Density",
-                         f"{b.battery_energy_density_wh_kg:.1f} Wh/kg",
-                         "Li-Po cell specific energy"])
-            rows.append(["Battery Efficiency",
-                         f"{b.battery_efficiency:.3f}",
-                         "Charge/discharge efficiency"])
+            rows.append([
+                t("mr.row.battery_energy_density"),
+                f"{b.battery_energy_density_wh_kg:.1f} Wh/kg",
+                t("mr.desc.battery_energy_density"),
+            ])
+            rows.append([
+                t("mr.row.battery_efficiency"),
+                f"{b.battery_efficiency:.3f}",
+                t("mr.desc.battery_efficiency"),
+            ])
 
         rb.add_table(
-            headers=["Parameter", "Value", "Description"],
+            headers=[t("col.parameter"), t("col.value"), t("col.description")],
             rows=rows,
-            caption="Mission design requirements and aerodynamic parameters",
+            caption=t("section.mission_requirements.table.brief_caption"),
         )
 
-        # Mission segments. The energy_source on each segment defaults to FUEL;
-        # the engine resolves it per-propulsion via with_energy_source(). We do
-        # the same here so the report mirrors what the weight engine actually uses.
-        rb.add_heading("Mission Segments", level=2)
+        # Mission segments — energy_source normalised per propulsion so the
+        # report mirrors what the weight engine actually computes.
+        rb.add_heading(t("section.mission_requirements.heading.segments"), level=2)
+        yes = t("common.yes")
+        no  = t("common.no")
+        fixed_fraction = t("common.fixed_fraction")
         seg_rows = []
         for i, seg in enumerate(b.mission_segments, 1):
             normalised = seg.with_energy_source(b.propulsion_type)
             kind = normalised.segment_type.name
-            enabled = "Yes" if normalised.enabled else "No"
+            enabled = yes if normalised.enabled else no
             energy = normalised.energy_source.value
             if isinstance(normalised, CruiseMissionSegment):
-                params = f"Range: {normalised.range_km:.1f} km"
+                params = t("mr.params.cruise_range", range_km=normalised.range_km)
             elif isinstance(normalised, LoiterMissionSegment):
-                params = f"Endurance: {normalised.endurance_hr:.2f} hr"
+                params = t("mr.params.loiter_endurance",
+                           endurance_hr=normalised.endurance_hr)
             else:
-                params = "Fixed fraction"
+                params = fixed_fraction
             seg_rows.append([str(i), kind, enabled, energy, params])
 
         rb.add_table(
-            headers=["#", "Segment Type", "Enabled", "Energy Source", "Parameters"],
+            headers=[
+                "#",
+                t("section.mission_requirements.col.segment_type"),
+                t("section.mission_requirements.col.enabled"),
+                t("section.mission_requirements.col.energy_source"),
+                t("section.mission_requirements.col.parameters"),
+            ],
             rows=seg_rows,
-            caption="Mission segment profile",
+            caption=t("section.mission_requirements.table.segments_caption"),
         )
 
         # Totals
@@ -84,8 +100,8 @@ class MissionRequirementsSection(ReportSection):
         total_endurance = b.total_endurance_hr
         if total_range > 0 or total_endurance > 0:
             rb.add_key_value_list([
-                ("Total Range from enabled cruise segments",
+                (t("section.mission_requirements.kv.total_range"),
                  f"{total_range:.1f} km"),
-                ("Total Endurance from enabled loiter segments",
+                (t("section.mission_requirements.kv.total_endurance"),
                  f"{total_endurance:.2f} hr"),
             ])
