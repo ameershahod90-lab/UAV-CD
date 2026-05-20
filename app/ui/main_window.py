@@ -23,12 +23,14 @@ from PyQt6.QtWidgets import (
 
 from app.core.enums import ThemeOption
 from app.services.database_service import DatabaseService
+from app.services.sensitivity_service import SensitivityService
 from app.services.sizing_service import SizingService
 from app.state.store import AppStore
 from app.ui.tabs.sizing.constraints_tab import ConstraintsTab
 from app.ui.tabs.sizing.general_tab import GeneralTab
 from app.ui.tabs.sizing.mission_tab import MissionTab
 from app.ui.tabs.sizing.output_tab import OutputTab
+from app.ui.tabs.sizing.sensitivity_tab import SensitivityTab
 from app.ui.tabs.sizing.weight_tab import WeightTab
 from app.ui.themes import QSS_DARK, QSS_LIGHT
 from app.ui.dialogs.export_dialog import ExportDialog
@@ -52,6 +54,11 @@ class MainWindow(QMainWindow):
         self._db_service: DatabaseService = DatabaseService(store)
         self._sizing_service: SizingService = SizingService(store, self)
         self._sizing_service.initialise()
+        # Sensitivity service — reactive to design_point_changed. Must be
+        # constructed AFTER the sizing service so the first sizing run
+        # already happened on tab construction.
+        self._sensitivity_service: SensitivityService = SensitivityService(store, self)
+        self._sensitivity_service.initialise()
 
         # ── Window setup ──────────────────────────────────────────────────
         self.setWindowTitle(store.window_title())
@@ -73,11 +80,13 @@ class MainWindow(QMainWindow):
         self._weight_tab      = WeightTab(store)
         self._constraints_tab = ConstraintsTab(store)
         self._output_tab      = OutputTab(store)
+        self._sensitivity_tab = SensitivityTab(store, self._sensitivity_service)
         sizing_tabs.addTab(self._general_tab,     "⚙  General")
         sizing_tabs.addTab(self._mission_tab,     "📋  Mission")
         sizing_tabs.addTab(self._weight_tab,      "⚖  Weight")
         sizing_tabs.addTab(self._constraints_tab, "📊  Constraints")
         sizing_tabs.addTab(self._output_tab,      "🎯  Output")
+        sizing_tabs.addTab(self._sensitivity_tab, "🔍  Sensitivity")
         root.addTab(sizing_tabs, "Phase 1 — Initial Sizing")
 
         # Historical data tab (placeholder for now — full implementation next)
