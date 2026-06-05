@@ -13,7 +13,7 @@ Adding a new tracked output is one line in this file.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from app.core.entities import (
@@ -21,6 +21,7 @@ from app.core.entities import (
     DesignPoint,
     WeightResult,
 )
+from app.core.sensitivity.predicates import InclusionPredicate, always
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,11 @@ class OutputSpec:
     unit:       str            # SI unit symbol shown in plots
     tier:       int            # 1 = headline, 2 = structural, 3 = aero, 4 = energy
     accessor:   Callable[["SizingOutcome"], Optional[float]]
+    # Same inclusion-predicate pattern as SweepableParameter — every
+    # output currently uses ``always``, but the field exists so future
+    # outputs (e.g. a fuel-specific output) can declare gating without
+    # schema migration.
+    is_included: InclusionPredicate = field(default=always)
 
 
 @dataclass(frozen=True)

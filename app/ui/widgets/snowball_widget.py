@@ -21,7 +21,16 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from app.core.sensitivity import SnowballReport
+from app.core.display_converter import DisplayConverter
+from app.core.enums import PropulsionType
+from app.core.sensitivity import (
+    SnowballFactor,
+    SnowballReport,
+    display_label_for_output,
+    display_label_for_parameter,
+    unit_kind_for_output,
+    unit_kind_for_parameter,
+)
 
 
 class SnowballWidget(QWidget):
@@ -55,18 +64,46 @@ class SnowballWidget(QWidget):
         self._table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self._table.setShowGrid(True)
         self._table.setAlternatingRowColors(True)
-        self._table.setMinimumHeight(180)
+        # Reduced from 180 → 140 so the snowball + margins row fits on a
+        # 1280×860 viewport. QScrollArea on the tab handles overflow when
+        # the user wants more rows visible at once.
+        self._table.setMinimumHeight(140)
         layout.addWidget(self._table)
+
+        # Cached for live re-render when the user changes units.
+        self._current_report: Optional[SnowballReport] = None
+        self._current_converter: Optional[DisplayConverter] = None
+        self._current_propulsion_type: Optional[PropulsionType] = None
 
     # ── Public ────────────────────────────────────────────────────────────
 
-    def set_factors(self, report: SnowballReport) -> None:
+    def set_factors(
+        self,
+        report: SnowballReport,
+        *,
+        converter: DisplayConverter,
+        propulsion_type: PropulsionType,
+    ) -> None:
+        """Render the snowball table with propulsion-aware labels + units.
+
+        Output and input values are converted via ``DisplayConverter`` so
+        the table honours the user's unit preferences. Derivative values
+        are linearly scaled — for a derivative ``∂Y/∂X`` measured in
+        SI, the display value is ``si_value × (Y_factor / X_factor)`` —
+        and reflect the displayed units in both the numerator and
+        denominator.
+        """
+        self._current_report = report
+        self._current_converter = converter
+        self._current_propulsion_type = propulsion_type
+
         self._table.setRowCount(len(report.factors))
         for row, f in enumerate(report.factors):
-            label_in  = f.parameter.label
-            label_out = f.output_label
-            unit_in   = f.parameter.unit
-            unit_out  = f.output_unit
+            out_factor, out_unit = self._convert_output(f, converter, propulsion_type)
+            in_factor,  in_unit  = self._convert_parameter(f, converter)
+
+            label_in  = display_label_for_parameter(f.parameter, propulsion_type)
+            label_out = display_label_for_output(f.output_id, propulsion_type)
 
             sym_item = QTableWidgetItem(f"∂{label_out} / ∂{label_in}")
             sym_item.setTextAlignment(
@@ -74,15 +111,20 @@ class SnowballWidget(QWidget):
             )
             self._table.setItem(row, 0, sym_item)
 
-            if f.value is None:
+            if f.value is None or in_factor == 0:
                 value_item = QTableWidgetItem("—")
                 interp_item = QTableWidgetItem("Could not compute (pipeline failed)")
             else:
+                # ∂Y_display / ∂X_display = (∂Y_si / ∂X_si) × Y_factor / X_factor
+                display_value = f.value * out_factor / in_factor
                 value_item = QTableWidgetItem(
-                    f"{f.value:+.4g} {unit_out}/{unit_in}"
+                    f"{display_value:+.4g} {out_unit}/{in_unit}"
                 )
                 interp_item = QTableWidgetItem(
-                    self._format_interpretation(f, unit_in, unit_out)
+                    self._format_interpretation(
+                        label_in, label_out,
+                        in_unit, out_unit, display_value,
+                    )
                 )
             value_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
@@ -98,12 +140,45 @@ class SnowballWidget(QWidget):
     # ── Private ───────────────────────────────────────────────────────────
 
     @staticmethod
-    def _format_interpretation(f, unit_in: str, unit_out: str) -> str:
-        """Render a one-line plain-English sentence for the derivative."""
-        if f.value is None:
-            return "—"
-        sign = "increase" if f.value >= 0 else "decrease"
+    def _convert_output(
+        f: SnowballFactor,
+        converter: DisplayConverter,
+        propulsion_type: PropulsionType,
+    ) -> tuple[float, str]:
+        """Resolve (factor, unit) for the snowball factor's output side."""
+        kind = unit_kind_for_output(f.output_id, propulsion_type)
+        method = getattr(converter, kind, None)
+        if method is None:
+            return 1.0, f.output_unit
+        return method(1.0)
+
+    @staticmethod
+    def _convert_parameter(
+        f: SnowballFactor, converter: DisplayConverter,
+    ) -> tuple[float, str]:
+        """Resolve (factor, unit) for the snowball factor's input side."""
+        kind = unit_kind_for_parameter(f.parameter)
+        method = getattr(converter, kind, None)
+        if method is None:
+            return 1.0, f.parameter.unit
+        # Dimensionless parameters (CD0, AR, …) use the "ratio"
+        # passthrough method which returns the bland "—" placeholder;
+        # the parameter's own unit string is more informative for those.
+        if kind == "ratio":
+            return 1.0, f.parameter.unit
+        return method(1.0)
+
+    @staticmethod
+    def _format_interpretation(
+        label_in: str,
+        label_out: str,
+        unit_in: str,
+        unit_out: str,
+        display_value: float,
+    ) -> str:
+        """One-line plain-English sentence for the derivative (display units)."""
+        sign = "increase" if display_value >= 0 else "decrease"
         return (
-            f"Each +1 {unit_in} of {f.parameter.label} → "
-            f"{sign} of {abs(f.value):.3g} {unit_out} in {f.output_label}"
+            f"Each +1 {unit_in} of {label_in} → "
+            f"{sign} of {abs(display_value):.3g} {unit_out} in {label_out}"
         )

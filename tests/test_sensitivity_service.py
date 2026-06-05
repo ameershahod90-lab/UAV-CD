@@ -106,6 +106,88 @@ class TestSensitivityService:
         qapp.processEvents()
         assert len(received) == 1
 
+    def test_run_sweep_falls_back_to_settings_n_points(self, sized_store):
+        """When ``n_points`` is omitted, the service must use
+        ``settings.sens_n_points`` (not the old hard-coded 21)."""
+        import dataclasses
+        sized_store.update_settings(dataclasses.replace(
+            sized_store.settings, sens_n_points=15,
+        ))
+        svc = SensitivityService(sized_store)
+        params = svc.sweepable_parameters()
+        payload = next(p for p in params if p.field_name == "payload_mass_kg")
+        sweep = svc.run_sweep(payload)   # no kwargs
+        assert sweep is not None
+        assert len(sweep.points) == 15
+
+    def test_settings_change_triggers_snapshot_recompute(self, sized_store, qapp):
+        """When the user changes Δ% in settings, ``sensitivity_updated``
+        must fire so the tab repaints the tornados at the new perturbation."""
+        import dataclasses
+        svc = SensitivityService(sized_store)
+        svc.initialise()
+        svc.refresh()
+        fired: list[int] = []
+        svc.sensitivity_updated.connect(lambda: fired.append(1))
+        # Change sens_delta_pct from 20 → 35
+        sized_store.update_settings(dataclasses.replace(
+            sized_store.settings, sens_delta_pct=35.0,
+        ))
+        qapp.processEvents()
+        assert len(fired) >= 1, "sensitivity_updated did not fire on settings_changed"
+
+    def test_custom_tornado_output_ids_in_snapshot(self, sized_store):
+        """``sens_tornado_output_ids`` swaps which outputs the snapshot eagerly tornados."""
+        import dataclasses
+        sized_store.update_settings(dataclasses.replace(
+            sized_store.settings,
+            sens_tornado_output_ids=("mtow_kg", "wingspan_m", "ld_max"),
+        ))
+        svc = SensitivityService(sized_store)
+        svc.refresh()
+        assert set(svc.snapshot.tornado_by_output.keys()) == {
+            "mtow_kg", "wingspan_m", "ld_max",
+        }
+
+
+class TestSettingsRoundtrip:
+    """``UserSettings`` JSON roundtrip preserves the sensitivity fields."""
+
+    def test_sensitivity_fields_survive_json_roundtrip(self, tmp_path):
+        from app.state.settings import SettingsManager, UserSettings
+        import dataclasses
+        mgr = SettingsManager(path=str(tmp_path / "settings.json"))
+        custom = dataclasses.replace(
+            UserSettings(),
+            sens_delta_pct=27.5,
+            sens_n_points=33,
+            sens_severity_critical_pct=15.0,
+            sens_severity_tight_pct=45.0,
+            sens_tornado_output_ids=("mtow_kg", "wingspan_m", "ld_max"),
+        )
+        assert mgr.save(custom)
+        restored = mgr.load()
+        assert restored.sens_delta_pct == 27.5
+        assert restored.sens_n_points == 33
+        assert restored.sens_severity_critical_pct == 15.0
+        assert restored.sens_severity_tight_pct == 45.0
+        assert restored.sens_tornado_output_ids == (
+            "mtow_kg", "wingspan_m", "ld_max",
+        )
+
+    def test_corrupt_severity_thresholds_revert_to_defaults(self, tmp_path):
+        """If critical >= tight in settings.json, both revert to safe defaults."""
+        from app.state.settings import SettingsManager
+        import json
+        path = tmp_path / "settings.json"
+        json.dump({
+            "sens_severity_critical_pct": 80.0,
+            "sens_severity_tight_pct":    50.0,  # inverted!
+        }, path.open("w"))
+        restored = SettingsManager(path=str(path)).load()
+        assert restored.sens_severity_critical_pct == 10.0
+        assert restored.sens_severity_tight_pct    == 30.0
+
 
 # ── Tab construction ───────────────────────────────────────────────────────
 
@@ -118,9 +200,9 @@ class TestSensitivityTab:
         tab = SensitivityTab(sized_store, svc)
         # Trigger the slot manually to verify wiring
         tab._on_snapshot_updated()
-        # The 3 tornado widgets should now have data
-        assert len(tab._tornado_widgets) == 3
-        for widget in tab._tornado_widgets.values():
+        # 3 tornado slots, each a (combo, widget) pair
+        assert len(tab._tornado_slots) == 3
+        for _combo, widget in tab._tornado_slots:
             assert widget._current_data is not None
 
     def test_tab_handles_no_snapshot_gracefully(self, store):

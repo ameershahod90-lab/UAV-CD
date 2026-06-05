@@ -81,12 +81,12 @@ class MainWindow(QMainWindow):
         self._constraints_tab = ConstraintsTab(store)
         self._output_tab      = OutputTab(store)
         self._sensitivity_tab = SensitivityTab(store, self._sensitivity_service)
-        sizing_tabs.addTab(self._general_tab,     "⚙  General")
-        sizing_tabs.addTab(self._mission_tab,     "📋  Mission")
-        sizing_tabs.addTab(self._weight_tab,      "⚖  Weight")
-        sizing_tabs.addTab(self._constraints_tab, "📊  Constraints")
-        sizing_tabs.addTab(self._output_tab,      "🎯  Output")
-        sizing_tabs.addTab(self._sensitivity_tab, "🔍  Sensitivity")
+        sizing_tabs.addTab(self._general_tab,     "General")
+        sizing_tabs.addTab(self._mission_tab,     "Mission")
+        sizing_tabs.addTab(self._weight_tab,      "Weight")
+        sizing_tabs.addTab(self._constraints_tab, "Constraints")
+        sizing_tabs.addTab(self._output_tab,      "Output")
+        sizing_tabs.addTab(self._sensitivity_tab, "Sensitivity")
         root.addTab(sizing_tabs, "Phase 1 — Initial Sizing")
 
         # Historical data tab (placeholder for now — full implementation next)
@@ -97,11 +97,11 @@ class MainWindow(QMainWindow):
             "(Under active development — Phase 1 core complete)"
         )
         hist_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        root.addTab(hist_placeholder, "📁  Historical Data")
+        root.addTab(hist_placeholder, "Historical Data")
 
         # Settings tab
         from app.ui.tabs.settings_tab import SettingsTab
-        root.addTab(SettingsTab(store), "⚙  Settings")
+        root.addTab(SettingsTab(store), "Settings")
 
         # ── Status bar ────────────────────────────────────────────────────
         sb: QStatusBar = QStatusBar()

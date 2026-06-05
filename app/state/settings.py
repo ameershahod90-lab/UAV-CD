@@ -93,6 +93,23 @@ class UserSettings:
     # Historical data
     use_historical_data: bool = True
 
+    # ── Sensitivity Studio ────────────────────────────────────────────────
+    # Perturbation width for tornado / sweep (5–50 %; default Raymer-ish 20 %).
+    sens_delta_pct: float = 20.0
+    # Number of points in an OAT sweep (odd-only ideal; clamped to 11–51).
+    sens_n_points: int = 21
+    # Constraint-margin severity tiers as percentages — anything below
+    # ``critical`` is red, between ``critical`` and ``tight`` is amber,
+    # at or above ``tight`` is green. Industry default 10 / 30.
+    sens_severity_critical_pct: float = 10.0
+    sens_severity_tight_pct:    float = 30.0
+    # Per-slot tornado output picks (3 slots, defaults to the Tier-1 trio).
+    # Stored as a tuple of OUTPUT_CATALOG keys; invalid entries silently
+    # revert to the slot default on load.
+    sens_tornado_output_ids: tuple[str, str, str] = (
+        "mtow_kg", "wing_area_m2", "engine_power_w",
+    )
+
     def add_recent(self, path: str) -> None:
         """Prepend *path* to recent_projects, capping at MAX_RECENT."""
         if path in self.recent_projects:
@@ -191,7 +208,51 @@ def _from_dict(data: dict[str, Any]) -> UserSettings:
     settings.plot_grid_visible = bool(data.get("plot_grid_visible", True))
     settings.use_historical_data = bool(data.get("use_historical_data", True))
 
+    # Sensitivity Studio — clamp to safe ranges so a hand-edited
+    # settings.json cannot crash the studio with absurd values.
+    settings.sens_delta_pct = _clamp_float(
+        data.get("sens_delta_pct", 20.0), 5.0, 50.0, 20.0,
+    )
+    settings.sens_n_points = _clamp_int(
+        data.get("sens_n_points", 21), 11, 51, 21,
+    )
+    settings.sens_severity_critical_pct = _clamp_float(
+        data.get("sens_severity_critical_pct", 10.0), 0.0, 100.0, 10.0,
+    )
+    settings.sens_severity_tight_pct = _clamp_float(
+        data.get("sens_severity_tight_pct", 30.0), 0.0, 100.0, 30.0,
+    )
+    # Tight must be > critical; if hand-edit broke that, restore defaults.
+    if settings.sens_severity_tight_pct <= settings.sens_severity_critical_pct:
+        settings.sens_severity_critical_pct = 10.0
+        settings.sens_severity_tight_pct    = 30.0
+    raw_ids = data.get("sens_tornado_output_ids")
+    if isinstance(raw_ids, (list, tuple)) and len(raw_ids) == 3:
+        settings.sens_tornado_output_ids = tuple(
+            str(x) for x in raw_ids  # type: ignore[misc]
+        )
+
     return settings
+
+
+def _clamp_float(
+    raw: Any, lo: float, hi: float, default: float,
+) -> float:
+    """Coerce ``raw`` to float and clamp to [lo, hi]; fall back to ``default``."""
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, v))
+
+
+def _clamp_int(raw: Any, lo: int, hi: int, default: int) -> int:
+    """Coerce ``raw`` to int and clamp to [lo, hi]; fall back to ``default``."""
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, v))
 
 
 # ---------------------------------------------------------------------------

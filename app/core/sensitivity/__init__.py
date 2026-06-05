@@ -20,6 +20,12 @@ Sensitivity engines call the SAME ``WeightBuildupEngine`` / ``ConstraintAnalyzer
 match what the user sees in the sizing tabs.
 """
 
+from app.core.sensitivity.labels import (
+    display_label_for_output,
+    display_label_for_parameter,
+    unit_kind_for_output,
+    unit_kind_for_parameter,
+)
 from app.core.sensitivity.margins import (
     ConstraintMargin,
     MarginsReport,
@@ -35,9 +41,17 @@ from app.core.sensitivity.parameter_spec import (
     SweepableParameter,
     sweepable_parameters_for,
 )
+from app.core.sensitivity.predicates import (
+    InclusionPredicate,
+    always,
+    requires_is_electric,
+    requires_is_power_mode,
+    requires_uses_fuel,
+)
 from app.core.sensitivity.runner import SizingRunner
 from app.core.sensitivity.snowball import (
     SnowballFactor,
+    SnowballPair,
     SnowballReport,
     compute_snowball_factors,
 )
@@ -53,6 +67,19 @@ __all__ = [
     "SWEEPABLE_PARAMETERS",
     "SweepableParameter",
     "sweepable_parameters_for",
+    # labels + unit-kind resolution
+    "display_label_for_output",
+    "display_label_for_parameter",
+    "unit_kind_for_output",
+    "unit_kind_for_parameter",
+    # inclusion predicates
+    "InclusionPredicate",
+    "always",
+    "requires_uses_fuel",
+    "requires_is_electric",
+    "requires_is_power_mode",
+    # snowball
+    "SnowballPair",
     # runner
     "SizingRunner",
     # sweep + tornado

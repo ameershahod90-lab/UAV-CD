@@ -26,6 +26,7 @@ import pytest
 from PyQt6.QtWidgets import QApplication
 
 from app.core.coefficients import get_closest_textbook
+from app.core.entities import DesignBrief
 from app.core.enums import PropulsionType
 from app.core.sensitivity import (
     OUTPUT_CATALOG,
@@ -40,8 +41,15 @@ from app.core.sensitivity import (
     run_oat_sweep,
     sweepable_parameters_for,
 )
+
+
 from app.services.sizing_service import SizingService
 from app.state.store import AppStore
+
+
+def _brief(propulsion: PropulsionType) -> DesignBrief:
+    """Test helper: build a defaulted DesignBrief for a given propulsion."""
+    return DesignBrief(propulsion_type=propulsion)
 
 
 @pytest.fixture(scope="session")
@@ -108,23 +116,41 @@ class TestOutputCatalog:
 
 class TestParameterSpec:
     def test_electric_excludes_sfc_and_includes_battery(self):
-        params = sweepable_parameters_for(PropulsionType.ELECTRIC)
+        params = sweepable_parameters_for(_brief(PropulsionType.ELECTRIC))
         names = {p.field_name for p in params}
         assert "specific_fuel_consumption_g_wh" not in names
         assert "battery_energy_density_wh_kg" in names
         assert "battery_efficiency" in names
 
     def test_piston_includes_sfc_excludes_battery(self):
-        params = sweepable_parameters_for(PropulsionType.PISTON)
+        params = sweepable_parameters_for(_brief(PropulsionType.PISTON))
         names = {p.field_name for p in params}
         assert "specific_fuel_consumption_g_wh" in names
         assert "battery_energy_density_wh_kg" not in names
 
     def test_hybrid_includes_both(self):
-        params = sweepable_parameters_for(PropulsionType.HYBRID)
+        params = sweepable_parameters_for(_brief(PropulsionType.HYBRID))
         names = {p.field_name for p in params}
         assert "specific_fuel_consumption_g_wh" in names
         assert "battery_energy_density_wh_kg" in names
+
+    def test_turbojet_excludes_prop_efficiency(self):
+        """Regression: prop_efficiency is power-mode only — it must not
+        appear for TURBOJET, which has no propeller and whose constraint
+        equations (Sadraey Eq. 2.40 / 2.41 / 2.44 / 2.46) never read it."""
+        params = sweepable_parameters_for(_brief(PropulsionType.TURBOJET))
+        names = {p.field_name for p in params}
+        assert "prop_efficiency" not in names
+
+    def test_prop_efficiency_included_for_power_mode(self):
+        """All power-mode propulsion types must still expose prop_efficiency."""
+        for prop in (PropulsionType.ELECTRIC, PropulsionType.PISTON,
+                     PropulsionType.TURBOPROP, PropulsionType.HYBRID):
+            params = sweepable_parameters_for(_brief(prop))
+            names = {p.field_name for p in params}
+            assert "prop_efficiency" in names, (
+                f"prop_efficiency missing for {prop.name}"
+            )
 
     def test_all_parameters_have_sensible_bounds(self):
         for p in SWEEPABLE_PARAMETERS:
@@ -132,6 +158,9 @@ class TestParameterSpec:
             assert p.field_name
             assert p.label
             assert p.unit
+            assert callable(p.is_included), (
+                f"{p.field_name} missing is_included predicate"
+            )
 
 
 # ── Sizing runner ──────────────────────────────────────────────────────────
@@ -165,7 +194,7 @@ class TestSizingRunner:
 class TestOATSweep:
     def test_default_sweep_produces_n_monotonic_points(self, sized_store, coeffs):
         brief = sized_store.state.sizing.brief
-        params = sweepable_parameters_for(brief.propulsion_type)
+        params = sweepable_parameters_for(brief)
         payload_param = next(p for p in params if p.field_name == "payload_mass_kg")
         sweep = run_oat_sweep(brief, coeffs, payload_param, n_points=11)
         assert isinstance(sweep, OATSweep)
@@ -179,7 +208,7 @@ class TestOATSweep:
 
     def test_outputs_for_returns_parallel_arrays(self, sized_store, coeffs):
         brief = sized_store.state.sizing.brief
-        params = sweepable_parameters_for(brief.propulsion_type)
+        params = sweepable_parameters_for(brief)
         payload_param = next(p for p in params if p.field_name == "payload_mass_kg")
         sweep = run_oat_sweep(brief, coeffs, payload_param, n_points=5)
         xs, ys = sweep.outputs_for("mtow_kg")
@@ -197,7 +226,7 @@ class TestOATSweep:
 class TestTornado:
     def test_tornado_sorted_by_magnitude(self, sized_store, coeffs):
         brief = sized_store.state.sizing.brief
-        params = sweepable_parameters_for(brief.propulsion_type)
+        params = sweepable_parameters_for(brief)
         tornado = compute_tornado(brief, coeffs, params, "mtow_kg")
         assert isinstance(tornado, TornadoData)
         assert tornado.output_id == "mtow_kg"
@@ -212,7 +241,7 @@ class TestTornado:
         MTOW. (For an electric UAV battery params can outrank it; we just
         assert payload is at least a top-tier contributor.)"""
         brief = sized_store.state.sizing.brief
-        params = sweepable_parameters_for(brief.propulsion_type)
+        params = sweepable_parameters_for(brief)
         tornado = compute_tornado(brief, coeffs, params, "mtow_kg")
         top5 = {b.parameter.field_name for b in tornado.bars[:5]}
         assert "payload_mass_kg" in top5, (
@@ -225,7 +254,7 @@ class TestTornado:
         constraint stall LINE depends on it). The bar should rank near the
         bottom."""
         brief = sized_store.state.sizing.brief
-        params = sweepable_parameters_for(brief.propulsion_type)
+        params = sweepable_parameters_for(brief)
         tornado = compute_tornado(brief, coeffs, params, "mtow_kg")
         # Find the stall_speed bar's rank (0 = top)
         rank = next(
@@ -320,6 +349,151 @@ class TestSnowballFactors:
             assert f.phrasing_key.startswith("snowball.")
 
 
+# ── Propulsion-aware labels + DC unit-kind mapping ─────────────────────────
+
+
+class TestPropulsionAwareLabels:
+    """Verifies ``app/core/sensitivity/labels.py`` returns propulsion-correct
+    labels and DisplayConverter method names so the UI layer can show
+    `Engine Thrust [N]` for jets vs `Engine Power [W]` for prop modes,
+    `Battery Mass` vs `Fuel Mass`, etc., without inlining propulsion checks.
+    """
+
+    def test_engine_power_label_flips_between_power_and_thrust(self):
+        from app.core.sensitivity import display_label_for_output
+        assert display_label_for_output(
+            "engine_power_w", PropulsionType.ELECTRIC,
+        ) == "Engine Power"
+        assert display_label_for_output(
+            "engine_power_w", PropulsionType.PISTON,
+        ) == "Engine Power"
+        assert display_label_for_output(
+            "engine_power_w", PropulsionType.TURBOJET,
+        ) == "Engine Thrust"
+
+    def test_loading_label_flips_between_power_and_thrust(self):
+        from app.core.sensitivity import display_label_for_output
+        assert display_label_for_output(
+            "power_loading_nw", PropulsionType.ELECTRIC,
+        ) == "Power Loading W/P"
+        assert display_label_for_output(
+            "power_loading_nw", PropulsionType.TURBOJET,
+        ) == "Thrust Loading T/W"
+
+    def test_fuel_battery_mass_label_per_propulsion(self):
+        from app.core.sensitivity import display_label_for_output
+        assert display_label_for_output(
+            "w_fuel_or_battery_kg", PropulsionType.ELECTRIC,
+        ) == "Battery Mass"
+        assert display_label_for_output(
+            "w_fuel_or_battery_kg", PropulsionType.PISTON,
+        ) == "Fuel Mass"
+        assert display_label_for_output(
+            "w_fuel_or_battery_kg", PropulsionType.HYBRID,
+        ) == "Fuel + Battery Mass"
+
+    def test_fixed_output_labels_unchanged_across_propulsion(self):
+        """MTOW, Wing Area, etc. don't depend on propulsion."""
+        from app.core.sensitivity import display_label_for_output
+        for output_id in ("mtow_kg", "wing_area_m2", "wingspan_m",
+                          "w_empty_kg", "ld_max", "cl_cruise"):
+            for prop in PropulsionType:
+                assert display_label_for_output(output_id, prop) == \
+                    OUTPUT_CATALOG[output_id].label
+
+    def test_unit_kind_for_output_maps_to_dc_methods(self):
+        """Returned strings must match real ``DisplayConverter`` methods so
+        the widget's ``getattr(dc, kind)(...)`` call works at runtime."""
+        from app.core.display_converter import DisplayConverter
+        from app.core.sensitivity import unit_kind_for_output
+        from app.state.settings import UserSettings
+        dc = DisplayConverter(UserSettings())
+        # Every output must resolve to a callable DC method
+        for output_id in OUTPUT_CATALOG.keys():
+            for prop in PropulsionType:
+                kind = unit_kind_for_output(output_id, prop)
+                assert hasattr(dc, kind), (
+                    f"output {output_id} for {prop.name} → kind '{kind}' "
+                    f"not on DisplayConverter"
+                )
+
+    def test_engine_power_kind_is_force_for_jets_only(self):
+        from app.core.sensitivity import unit_kind_for_output
+        assert unit_kind_for_output(
+            "engine_power_w", PropulsionType.ELECTRIC,
+        ) == "power"
+        assert unit_kind_for_output(
+            "engine_power_w", PropulsionType.PISTON,
+        ) == "power"
+        assert unit_kind_for_output(
+            "engine_power_w", PropulsionType.TURBOJET,
+        ) == "force"
+
+    def test_unit_kind_for_parameter_maps_to_dc_methods(self):
+        from app.core.display_converter import DisplayConverter
+        from app.core.sensitivity import unit_kind_for_parameter
+        from app.state.settings import UserSettings
+        dc = DisplayConverter(UserSettings())
+        for p in SWEEPABLE_PARAMETERS:
+            kind = unit_kind_for_parameter(p)
+            assert hasattr(dc, kind), (
+                f"parameter {p.field_name} → kind '{kind}' "
+                f"not on DisplayConverter"
+            )
+
+
+# ── Configurable severity thresholds ───────────────────────────────────────
+
+
+class TestMarginsConfigurableSeverity:
+    """`compute_constraint_margins` accepts critical_pct / tight_pct so the
+    UI's user-configurable severity tiers actually take effect."""
+
+    def test_default_thresholds_match_industry_convention(self, sized_store):
+        """Without overrides, defaults are 10 % critical / 30 % tight."""
+        s = sized_store.state.sizing
+        report = compute_constraint_margins(s.design_point, s.constraint_result)
+        # Each margin classified using the 10 / 30 scheme — a margin of
+        # 15 % must be "tight" (not "critical").
+        for m in report.margins:
+            if 0 <= m.margin_pct < 10:
+                assert m.severity == "critical"
+            elif 10 <= m.margin_pct < 30:
+                assert m.severity == "tight"
+            elif m.margin_pct >= 30:
+                assert m.severity == "ok"
+            else:  # negative
+                assert m.severity == "critical"
+
+    def test_tightening_critical_threshold_promotes_severity(self, sized_store):
+        """Setting critical = 50 % forces all-below-50 % margins to critical."""
+        s = sized_store.state.sizing
+        report = compute_constraint_margins(
+            s.design_point, s.constraint_result,
+            critical_pct=50.0, tight_pct=60.0,
+        )
+        for m in report.margins:
+            if m.margin_pct < 50.0:
+                assert m.severity == "critical", (
+                    f"{m.name} @ {m.margin_pct:.1f} % should be critical "
+                    f"under critical=50 / tight=60"
+                )
+
+    def test_loosening_thresholds_demotes_severity(self, sized_store):
+        """Setting critical = 1 % / tight = 5 % moves more margins to ok."""
+        s = sized_store.state.sizing
+        report = compute_constraint_margins(
+            s.design_point, s.constraint_result,
+            critical_pct=1.0, tight_pct=5.0,
+        )
+        for m in report.margins:
+            if m.margin_pct >= 5.0:
+                assert m.severity == "ok", (
+                    f"{m.name} @ {m.margin_pct:.1f} % should be ok "
+                    f"under critical=1 / tight=5"
+                )
+
+
 # ── Performance budget ─────────────────────────────────────────────────────
 
 
@@ -329,7 +503,7 @@ class TestPerformance:
         recompute it on every brief change without feeling sluggish."""
         import time
         brief = sized_store.state.sizing.brief
-        params = sweepable_parameters_for(brief.propulsion_type)
+        params = sweepable_parameters_for(brief)
         t0 = time.perf_counter()
         compute_tornado(brief, coeffs, params, "mtow_kg")
         dt = time.perf_counter() - t0

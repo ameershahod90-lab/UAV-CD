@@ -25,7 +25,7 @@ catches this elsewhere; here we surface the magnitude.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Final, Optional
 
 import numpy as np
 
@@ -34,6 +34,11 @@ from app.core.entities import (
     ConstraintResult,
     DesignPoint,
 )
+
+# Industry defaults — Sadraey-style early-design slack convention.
+# Caller may override via ``compute_constraint_margins`` keyword args.
+_DEFAULT_CRITICAL_PCT: Final[float] = 10.0
+_DEFAULT_TIGHT_PCT:    Final[float] = 30.0
 
 
 @dataclass(frozen=True)
@@ -64,18 +69,32 @@ class MarginsReport:
     most_violated:  Optional[ConstraintMargin]   # the most violated (if any)
 
 
-def _severity(margin_pct: float) -> str:
+def _severity(
+    margin_pct: float,
+    critical_pct: float,
+    tight_pct: float,
+) -> str:
+    """Map a margin to a severity tier using configurable thresholds.
+
+    ``critical_pct`` and ``tight_pct`` are the cut points: anything
+    below ``critical_pct`` (or negative) is "critical", between
+    ``critical_pct`` and ``tight_pct`` is "tight", at or above
+    ``tight_pct`` is "ok".
+    """
     if margin_pct < 0:
         return "critical"
-    if margin_pct < 10:
+    if margin_pct < critical_pct:
         return "critical"
-    if margin_pct < 30:
+    if margin_pct < tight_pct:
         return "tight"
     return "ok"
 
 
 def _stall_margin(
-    dp: DesignPoint, cr: ConstraintResult,
+    dp: DesignPoint,
+    cr: ConstraintResult,
+    critical_pct: float,
+    tight_pct: float,
 ) -> ConstraintMargin:
     """Stall is a vertical line in (W/S). Margin = (stall − dp) / stall."""
     stall_ws = cr.stall_ws_nm2
@@ -86,12 +105,16 @@ def _stall_margin(
         margin_pct=margin,
         boundary_value=stall_ws,
         dp_value=dp_ws,
-        severity=_severity(margin),
+        severity=_severity(margin, critical_pct, tight_pct),
     )
 
 
 def _curve_margin(
-    dp: DesignPoint, cr: ConstraintResult, curve: ConstraintCurve,
+    dp: DesignPoint,
+    cr: ConstraintResult,
+    curve: ConstraintCurve,
+    critical_pct: float,
+    tight_pct: float,
 ) -> ConstraintMargin:
     """Curve margin: interpolate the boundary loading at dp's W/S, compare."""
     ws_arr = np.asarray(curve.wing_loading_values, dtype=float)
@@ -120,18 +143,31 @@ def _curve_margin(
         margin_pct=margin,
         boundary_value=boundary,
         dp_value=dp_loading,
-        severity=_severity(margin),
+        severity=_severity(margin, critical_pct, tight_pct),
     )
 
 
 def compute_constraint_margins(
     design_point: DesignPoint,
     constraint_result: ConstraintResult,
+    *,
+    critical_pct: float = _DEFAULT_CRITICAL_PCT,
+    tight_pct:    float = _DEFAULT_TIGHT_PCT,
 ) -> MarginsReport:
-    """Compute margins for all 5 constraints + identify the binding one."""
-    margins = [_stall_margin(design_point, constraint_result)]
+    """Compute margins for all 5 constraints + identify the binding one.
+
+    ``critical_pct`` / ``tight_pct`` are the severity tier cut-points
+    (% margin). Defaults reproduce the previous hard-coded 10 / 30
+    behaviour; the service layer plumbs in the user's configured values
+    from ``UserSettings`` so designers can tighten or loosen the bands.
+    """
+    margins = [_stall_margin(
+        design_point, constraint_result, critical_pct, tight_pct,
+    )]
     for curve in constraint_result.curves:
-        margins.append(_curve_margin(design_point, constraint_result, curve))
+        margins.append(_curve_margin(
+            design_point, constraint_result, curve, critical_pct, tight_pct,
+        ))
 
     # Binding = smallest non-violated margin (the one that bites first if
     # the design moves).

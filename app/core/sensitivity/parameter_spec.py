@@ -5,17 +5,34 @@ Each entry declares one DesignBrief field as sweep-able + the physical
 range it makes sense to vary over (clamps the ±% sweep against absurd
 values like negative aspect ratio).
 
-A few inputs are only meaningful for certain propulsion types
-(battery params for electric / hybrid; SFC for fuel / hybrid).
-``sweepable_parameters_for(propulsion_type)`` returns the relevant subset.
+Inputs that don't apply to every propulsion mode carry an
+``is_included(brief) -> bool`` predicate that the fetching pipeline
+checks before exposing the parameter. Examples:
+
+  * ``prop_efficiency`` — only valid for power-mode propulsion
+    (Electric / Piston / Turboprop / Hybrid); the jet branches in
+    ``constraints.py`` never read it.
+  * ``specific_fuel_consumption_g_wh`` — only valid when the engine
+    burns fuel (Piston / Turboprop / Turbojet / Hybrid).
+  * ``battery_energy_density_wh_kg`` / ``battery_efficiency`` — only
+    valid when the engine draws on a battery (Electric / Hybrid).
+
+See ``app/core/sensitivity/predicates.py`` for the named predicate
+functions used here.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
 
-from app.core.enums import PropulsionType
+from app.core.entities import DesignBrief
+from app.core.sensitivity.predicates import (
+    InclusionPredicate,
+    always,
+    requires_is_electric,
+    requires_is_power_mode,
+    requires_uses_fuel,
+)
 
 
 @dataclass(frozen=True)
@@ -28,9 +45,11 @@ class SweepableParameter:
     unit:       str            # SI unit symbol
     min_value:  float          # physical lower bound (clamp)
     max_value:  float          # physical upper bound (clamp)
-    # Propulsion gating — None means "always relevant"
-    requires_uses_fuel:    Optional[bool] = None
-    requires_is_electric:  Optional[bool] = None
+    # Single declarative predicate that tells the fetching pipeline
+    # whether this parameter is relevant for the given brief. Defaults
+    # to ``always`` (universal). Replaces the previous
+    # ``requires_uses_fuel`` / ``requires_is_electric`` boolean pair.
+    is_included: InclusionPredicate = field(default=always)
 
 
 # ── Master parameter list ───────────────────────────────────────────────────
@@ -88,44 +107,37 @@ SWEEPABLE_PARAMETERS: tuple[SweepableParameter, ...] = (
         "-", 0.5, 0.99,
     ),
     SweepableParameter(
+        # η_p only enters power-mode equations — gated to is_power_mode.
         "prop_efficiency", "Propulsive Efficiency (ηₚ)",
         "sens.param.prop_efficiency", "-", 0.3, 0.95,
+        is_included=requires_is_power_mode,
     ),
 
     # ── Propulsion-specific ──────────────────────────────────────────────
     SweepableParameter(
         "specific_fuel_consumption_g_wh", "SFC",
         "sens.param.sfc", "g/(W·h)", 0.05, 1.5,
-        requires_uses_fuel=True,
+        is_included=requires_uses_fuel,
     ),
     SweepableParameter(
         "battery_energy_density_wh_kg", "Battery Energy Density",
         "sens.param.battery_energy_density", "Wh/kg", 100.0, 800.0,
-        requires_is_electric=True,
+        is_included=requires_is_electric,
     ),
     SweepableParameter(
         "battery_efficiency", "Battery Efficiency",
         "sens.param.battery_efficiency", "-", 0.5, 0.99,
-        requires_is_electric=True,
+        is_included=requires_is_electric,
     ),
 )
 
 
-def sweepable_parameters_for(
-    propulsion_type: PropulsionType,
-) -> list[SweepableParameter]:
-    """Return the subset of parameters relevant to ``propulsion_type``.
+def sweepable_parameters_for(brief: DesignBrief) -> list[SweepableParameter]:
+    """Return the subset of parameters relevant to the current brief.
 
-    Battery params drop out for fuel-only propulsion. SFC drops out for
-    pure electric. HYBRID keeps everything.
+    A parameter is included iff ``parameter.is_included(brief)`` returns
+    True. The default predicate is ``always`` (universal); propulsion-
+    gated parameters use ``requires_*`` predicates from
+    ``app/core/sensitivity/predicates.py``.
     """
-    out: list[SweepableParameter] = []
-    for p in SWEEPABLE_PARAMETERS:
-        if p.requires_uses_fuel is not None:
-            if p.requires_uses_fuel and not propulsion_type.uses_fuel:
-                continue
-        if p.requires_is_electric is not None:
-            if p.requires_is_electric and not propulsion_type.is_electric:
-                continue
-        out.append(p)
-    return out
+    return [p for p in SWEEPABLE_PARAMETERS if p.is_included(brief)]

@@ -88,6 +88,11 @@ class SensitivityService(QObject):
     def initialise(self) -> None:
         """Connect signals; call once after the store is ready."""
         self._store.design_point_changed.connect(self._on_design_point_changed)
+        # Sensitivity-relevant settings (delta_pct, n_points, severity
+        # thresholds, tornado output picks) live in UserSettings; on
+        # change we must regenerate the snapshot so the eager tornados
+        # use the new perturbation width and the margins re-classify.
+        self._store.settings_changed.connect(self._on_settings_changed)
 
     @property
     def snapshot(self) -> Optional[SensitivitySnapshot]:
@@ -106,18 +111,27 @@ class SensitivityService(QObject):
         self,
         parameter: SweepableParameter,
         *,
-        n_points: int = 21,
-        delta_pct: float = 20.0,
+        n_points: Optional[int] = None,
+        delta_pct: Optional[float] = None,
     ) -> Optional[OATSweep]:
         """Run an OAT sweep for one parameter.
 
         Returns the OATSweep payload synchronously and also emits the
         ``sweep_completed`` signal (kept for parity with future async
         implementations). Returns None if the store has no design yet.
+
+        If ``n_points`` / ``delta_pct`` are ``None``, falls back to the
+        values configured in ``UserSettings`` (defaults 21 / 20 %).
+        Explicit kwargs still win — useful for tests and one-off probes.
         """
         coeffs = self._current_coeffs()
         if coeffs is None:
             return None
+        cfg = self._store.settings
+        if n_points is None:
+            n_points = cfg.sens_n_points
+        if delta_pct is None:
+            delta_pct = cfg.sens_delta_pct
         brief = self._store.state.sizing.brief
         sweep = run_oat_sweep(
             brief, coeffs, parameter,
@@ -127,12 +141,25 @@ class SensitivityService(QObject):
         return sweep
 
     def sweepable_parameters(self) -> list[SweepableParameter]:
-        """Return the parameters relevant to the current propulsion type."""
-        return sweepable_parameters_for(self._store.state.sizing.brief.propulsion_type)
+        """Return the parameters relevant to the current design brief.
+
+        Filtering goes through each parameter's ``is_included(brief)``
+        predicate, which can gate on propulsion, mission segments, or
+        anything else carried by the brief.
+        """
+        return sweepable_parameters_for(self._store.state.sizing.brief)
 
     # ── Internal ──────────────────────────────────────────────────────────
 
     def _on_design_point_changed(self) -> None:
+        self._compute_snapshot()
+
+    def _on_settings_changed(self) -> None:
+        # Skip if there's no design yet — the tab's empty-state label
+        # is enough until the user clicks Run.
+        s = self._store.state.sizing
+        if s.design_point is None:
+            return
         self._compute_snapshot()
 
     def _compute_snapshot(self) -> bool:
@@ -146,16 +173,33 @@ class SensitivityService(QObject):
 
         try:
             brief = s.brief
-            params = sweepable_parameters_for(brief.propulsion_type)
+            cfg   = self._store.settings
+            params = sweepable_parameters_for(brief)
+
+            # Eagerly tornado the THREE user-selected output slots
+            # (defaults to the Tier-1 trio). If a slot's output_id is
+            # missing from OUTPUT_CATALOG (hand-edited settings.json),
+            # we silently skip it — the UI keeps any usable slots.
+            eager_ids = tuple(
+                oid for oid in cfg.sens_tornado_output_ids
+                if oid  # filter empty/invalid
+            ) or self._EAGER_TORNADO_OUTPUTS
 
             tornado_by_output = {
                 output_id: compute_tornado(
-                    brief, coeffs, params, output_id, runner=self._runner,
+                    brief, coeffs, params, output_id,
+                    runner=self._runner, delta_pct=cfg.sens_delta_pct,
                 )
-                for output_id in self._EAGER_TORNADO_OUTPUTS
+                for output_id in eager_ids
             }
-            margins  = compute_constraint_margins(s.design_point, s.constraint_result)
-            snowball = compute_snowball_factors(brief, coeffs, runner=self._runner)
+            margins = compute_constraint_margins(
+                s.design_point, s.constraint_result,
+                critical_pct=cfg.sens_severity_critical_pct,
+                tight_pct=cfg.sens_severity_tight_pct,
+            )
+            snowball = compute_snowball_factors(
+                brief, coeffs, runner=self._runner,
+            )
 
             self._snapshot = SensitivitySnapshot(
                 tornado_by_output=tornado_by_output,

@@ -23,7 +23,7 @@ the user's language ("each extra kilogram of payload adds N kg of MTOW").
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from app.core.entities import DesignBrief, RegressionCoeffs
@@ -32,6 +32,7 @@ from app.core.sensitivity.parameter_spec import (
     SWEEPABLE_PARAMETERS,
     SweepableParameter,
 )
+from app.core.sensitivity.predicates import InclusionPredicate, always
 from app.core.sensitivity.runner import SizingRunner
 
 
@@ -57,23 +58,47 @@ class SnowballReport:
     factors: tuple[SnowballFactor, ...]
 
 
-# ── Pre-curated pairs (output_id, parameter_field_name) ─────────────────────
-#
+# ── Curated default snowball pairs ─────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SnowballPair:
+    """One ``(output, input)`` derivative the snowball compute will evaluate.
+
+    The pair carries its own ``is_included(brief)`` predicate so a future
+    pair like "∂MTOW/∂SFC" could be auto-skipped for electric aircraft
+    even without touching the compute loop. Today all default pairs use
+    universal inputs/outputs and inherit ``always``.
+
+    Pairs are also auto-skipped when:
+      * the referenced ``output_id`` is not in OUTPUT_CATALOG, or
+      * the referenced ``field_name`` is not in SWEEPABLE_PARAMETERS, or
+      * the input parameter's own predicate excludes it for this brief.
+    """
+
+    output_id:    str
+    field_name:   str
+    phrasing_key: str
+    is_included:  InclusionPredicate = field(default=always)
+
+
 # These are the classic conceptual-design sensitivities every aircraft
 # engineer carries in their head. Order matters — list shows top-to-bottom
-# in the UI. Pairs gated on propulsion are filtered at compute time.
+# in the UI. Pairs are also gated through their input parameter's own
+# ``is_included`` predicate at compute time, so propulsion-irrelevant
+# pairs (e.g. anything against SFC for an electric aircraft) drop out
+# automatically without per-pair maintenance.
 
-_DEFAULT_PAIRS: tuple[tuple[str, str, str], tuple[str, ...]] = (
-    # (output_id, parameter_field_name, phrasing_key)
-    ("mtow_kg",        "payload_mass_kg",     "snowball.mtow_per_payload"),
-    ("mtow_kg",        "cruise_speed_ms",     "snowball.mtow_per_cruise_speed"),
-    ("mtow_kg",        "c_d0",                "snowball.mtow_per_cd0"),
-    ("mtow_kg",        "aspect_ratio",        "snowball.mtow_per_ar"),
-    ("engine_power_w", "payload_mass_kg",     "snowball.power_per_payload"),
-    ("engine_power_w", "cruise_speed_ms",     "snowball.power_per_cruise_speed"),
-    ("wing_area_m2",   "payload_mass_kg",     "snowball.wing_area_per_payload"),
-    ("wing_area_m2",   "c_l_max",             "snowball.wing_area_per_clmax"),
-    ("wingspan_m",     "aspect_ratio",        "snowball.wingspan_per_ar"),
+_DEFAULT_PAIRS: tuple[SnowballPair, ...] = (
+    SnowballPair("mtow_kg",        "payload_mass_kg",     "snowball.mtow_per_payload"),
+    SnowballPair("mtow_kg",        "cruise_speed_ms",     "snowball.mtow_per_cruise_speed"),
+    SnowballPair("mtow_kg",        "c_d0",                "snowball.mtow_per_cd0"),
+    SnowballPair("mtow_kg",        "aspect_ratio",        "snowball.mtow_per_ar"),
+    SnowballPair("engine_power_w", "payload_mass_kg",     "snowball.power_per_payload"),
+    SnowballPair("engine_power_w", "cruise_speed_ms",     "snowball.power_per_cruise_speed"),
+    SnowballPair("wing_area_m2",   "payload_mass_kg",     "snowball.wing_area_per_payload"),
+    SnowballPair("wing_area_m2",   "c_l_max",             "snowball.wing_area_per_clmax"),
+    SnowballPair("wingspan_m",     "aspect_ratio",        "snowball.wingspan_per_ar"),
 )
 
 
@@ -89,24 +114,32 @@ def compute_snowball_factors(
     ``delta_pct`` controls the central-difference width. 1 % keeps the
     derivative truly local; for non-linear inputs the user can compare
     against an OAT curve to see how much the slope changes globally.
+
+    Per-pair inclusion: each ``SnowballPair`` carries its own
+    ``is_included(brief)`` predicate; additionally, the referenced
+    OutputSpec and SweepableParameter must themselves be included for
+    the current brief. Anything else is silently dropped.
     """
     runner = runner or SizingRunner()
     # Index params by field name for quick lookup
     by_field = {p.field_name: p for p in SWEEPABLE_PARAMETERS}
 
     factors: list[SnowballFactor] = []
-    for output_id, field_name, phrasing_key in (
-        (oid, fn, pk) for oid, fn, pk in _DEFAULT_PAIRS
-    ):
-        spec = OUTPUT_CATALOG.get(output_id)
-        param = by_field.get(field_name)
+    for pair in _DEFAULT_PAIRS:
+        spec = OUTPUT_CATALOG.get(pair.output_id)
+        param = by_field.get(pair.field_name)
         if spec is None or param is None:
             continue
-        # Propulsion gating on the input parameter
-        if param.requires_uses_fuel and not base_brief.propulsion_type.uses_fuel:
+        # Three-layer inclusion: pair-level, output-level, input-level.
+        if not pair.is_included(base_brief):
             continue
-        if param.requires_is_electric and not base_brief.propulsion_type.is_electric:
+        if not spec.is_included(base_brief):
             continue
+        if not param.is_included(base_brief):
+            continue
+        output_id   = pair.output_id
+        field_name  = pair.field_name
+        phrasing_key = pair.phrasing_key
 
         # Central difference at ±delta_pct of the parameter's current value
         x0 = float(getattr(base_brief, field_name))
