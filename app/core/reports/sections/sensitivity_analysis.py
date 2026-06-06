@@ -11,6 +11,11 @@ Default config: tornados for the three slots configured on the live
 Sensitivity tab (``settings.sens_tornado_output_ids``), no sweeps,
 margins + snowball both included. The user can replace any of those
 choices via the Customise dialog in the export popup.
+
+i18n: every visible string flows through ``ctx.t(...)``. Output and
+parameter labels resolve via ``output_label_key`` / ``parameter_label_key``
+which honour the propulsion-aware variants (Engine Power vs Engine
+Thrust, Battery vs Fuel mass, W/P vs T/W).
 """
 
 from __future__ import annotations
@@ -32,8 +37,8 @@ from app.core.sensitivity import (
     compute_constraint_margins,
     compute_snowball_factors,
     compute_tornado,
-    display_label_for_output,
-    display_label_for_parameter,
+    output_label_key,
+    parameter_label_key,
     run_oat_sweep,
     sweepable_parameters_for,
     unit_kind_for_output,
@@ -152,22 +157,13 @@ class SensitivityAnalysisSection(ReportSection[SensitivityReportConfig]):
             render_tornado_png,
         )
 
-        rb.add_heading(self.title, level=1)
+        t = ctx.t
+        rb.add_heading(t("section.sensitivity.title"), level=1)
 
         # ── Intro ─────────────────────────────────────────────────────────
-        rb.add_paragraph(
-            "Sensitivity analysis quantifies how the design responds to "
-            "uncertainty in each requirement and aerodynamic coefficient. "
-            "Methodology follows Raymer (2018) Ch. 19 (tornado / trade "
-            "studies), Sadraey (2020) Sec. 2.10 (takeoff-weight "
-            "derivatives), and Keane et al. (2017) Ch. 4 (screening "
-            "sensitivity)."
-        )
+        rb.add_paragraph(t("section.sensitivity.intro"))
         if ctx.constraint_result is None or ctx.design_point is None:
-            rb.add_note(
-                "Sensitivity content requires a sized design point — run "
-                "sizing on the General tab before exporting."
-            )
+            rb.add_note(t("section.sensitivity.no_design_point"))
             return
 
         config = self._config or self.default_config(ctx)
@@ -181,40 +177,39 @@ class SensitivityAnalysisSection(ReportSection[SensitivityReportConfig]):
             or config.include_margins
             or config.include_snowball
         ):
-            rb.add_note(
-                "Section configured with no content (no tornados, no "
-                "sweeps, margins/snowball disabled)."
-            )
+            rb.add_note(t("section.sensitivity.empty_config"))
             return
 
         coeffs = ctx.regression_coeffs
         propulsion = ctx.brief.propulsion_type
         dc = ctx.display_converter
+        delta = ctx.settings.sens_delta_pct
 
         # ── Tornados ──────────────────────────────────────────────────────
         if config.tornado_output_ids:
             params = sweepable_parameters_for(ctx.brief)
             for output_id in config.tornado_output_ids:
-                out_label = display_label_for_output(output_id, propulsion)
-                rb.add_heading(f"Tornado — {out_label}", level=2)
+                out_label = t(output_label_key(output_id, propulsion))
+                rb.add_heading(
+                    t("section.sensitivity.heading.tornado", output=out_label),
+                    level=2,
+                )
                 if coeffs is None:
-                    rb.add_note(
-                        "Regression coefficients unavailable — skipped."
-                    )
+                    rb.add_note(t("section.sensitivity.no_coeffs"))
                     continue
                 td = compute_tornado(ctx.brief, coeffs, params, output_id)
                 png = render_tornado_png(td, propulsion, dc)
                 if png is None:
-                    rb.add_note(
-                        f"Could not render the {out_label} tornado figure."
-                    )
+                    rb.add_note(t(
+                        "section.sensitivity.tornado.render_failed",
+                        output=out_label,
+                    ))
                 else:
                     rb.add_figure(
                         png,
-                        caption=(
-                            f"Tornado of input impact on {out_label} "
-                            f"(±{ctx.settings.sens_delta_pct:.0f} % perturbation, "
-                            f"sorted by magnitude)."
+                        caption=t(
+                            "section.sensitivity.tornado.caption",
+                            output=out_label, delta=delta,
                         ),
                         width_cm=15.0,
                     )
@@ -223,42 +218,47 @@ class SensitivityAnalysisSection(ReportSection[SensitivityReportConfig]):
         if config.sweep_specs:
             params_by_field = {p.field_name: p for p in SWEEPABLE_PARAMETERS}
             for output_id, input_field in config.sweep_specs:
-                out_label = display_label_for_output(output_id, propulsion)
                 param = params_by_field.get(input_field)
                 if param is None:
                     continue
-                in_label = display_label_for_parameter(param, propulsion)
+                out_label = t(output_label_key(output_id, propulsion))
+                in_label  = t(parameter_label_key(param))
                 rb.add_heading(
-                    f"Sweep — {out_label} vs {in_label}", level=2,
+                    t(
+                        "section.sensitivity.heading.sweep",
+                        output=out_label, input=in_label,
+                    ),
+                    level=2,
                 )
                 if coeffs is None:
-                    rb.add_note(
-                        "Regression coefficients unavailable — skipped."
-                    )
+                    rb.add_note(t("section.sensitivity.no_coeffs"))
                     continue
                 sweep = run_oat_sweep(
                     ctx.brief, coeffs, param,
                     n_points=ctx.settings.sens_n_points,
-                    delta_pct=ctx.settings.sens_delta_pct,
+                    delta_pct=delta,
                 )
                 png = render_sweep_png(sweep, [output_id], propulsion, dc)
                 if png is None:
-                    rb.add_note(
-                        f"Could not render the {out_label} vs {in_label} sweep."
-                    )
+                    rb.add_note(t(
+                        "section.sensitivity.sweep.render_failed",
+                        output=out_label, input=in_label,
+                    ))
                 else:
                     rb.add_figure(
                         png,
-                        caption=(
-                            f"OAT sweep of {out_label} as {in_label} varies by "
-                            f"±{ctx.settings.sens_delta_pct:.0f} % around the design point."
+                        caption=t(
+                            "section.sensitivity.sweep.caption",
+                            output=out_label, input=in_label, delta=delta,
                         ),
                         width_cm=15.0,
                     )
 
         # ── Constraint margins ────────────────────────────────────────────
         if config.include_margins:
-            rb.add_heading("Constraint Margins", level=2)
+            rb.add_heading(
+                t("section.sensitivity.heading.margins"), level=2,
+            )
             report = compute_constraint_margins(
                 ctx.design_point, ctx.constraint_result,
                 critical_pct=ctx.settings.sens_severity_critical_pct,
@@ -266,65 +266,76 @@ class SensitivityAnalysisSection(ReportSection[SensitivityReportConfig]):
             )
             if report.most_violated is not None:
                 rb.add_paragraph(
-                    f"VIOLATED: {report.most_violated.name} "
-                    f"({report.most_violated.margin_pct:+.1f} %).",
+                    t(
+                        "section.sensitivity.margins.violated",
+                        constraint=report.most_violated.name,
+                        margin=report.most_violated.margin_pct,
+                    ),
                     bold=True,
                 )
             elif report.binding is not None:
-                rb.add_paragraph(
-                    f"Binding constraint: {report.binding.name} — "
-                    f"{report.binding.margin_pct:.1f} % margin "
-                    f"(bites first if requirements tighten).",
-                )
-            rows: list[list[str]] = []
-            severity_label = {
-                "critical": "Critical",
-                "tight":    "Tight",
-                "ok":       "OK",
+                rb.add_paragraph(t(
+                    "section.sensitivity.margins.binding",
+                    constraint=report.binding.name,
+                    margin=report.binding.margin_pct,
+                ))
+            severity_keys = {
+                "critical": t("section.sensitivity.severity.critical"),
+                "tight":    t("section.sensitivity.severity.tight"),
+                "ok":       t("section.sensitivity.severity.ok"),
             }
-            for m in report.margins:
-                rows.append([
-                    m.name,
-                    f"{m.margin_pct:+.1f} %",
-                    severity_label.get(m.severity, m.severity),
-                ])
+            rows = [
+                [m.name,
+                 f"{m.margin_pct:+.1f} %",
+                 severity_keys.get(m.severity, m.severity)]
+                for m in report.margins
+            ]
             rb.add_table(
-                headers=["Constraint", "Margin", "Severity"],
+                headers=[
+                    t("section.sensitivity.col.constraint"),
+                    t("section.sensitivity.col.margin"),
+                    t("section.sensitivity.col.severity"),
+                ],
                 rows=rows,
-                caption="Constraint margins at the design point.",
+                caption=t("section.sensitivity.margins.caption"),
             )
 
         # ── Snowball factors ──────────────────────────────────────────────
         if config.include_snowball:
-            rb.add_heading("Design Rules of Thumb (Snowball Factors)", level=2)
+            rb.add_heading(
+                t("section.sensitivity.heading.snowball"), level=2,
+            )
             if coeffs is None:
-                rb.add_note(
-                    "Regression coefficients unavailable — snowball factors skipped."
-                )
+                rb.add_note(t("section.sensitivity.snowball.no_coeffs"))
             else:
                 snowball = compute_snowball_factors(ctx.brief, coeffs)
-                rows = self._snowball_rows(snowball, propulsion, dc)
+                rows = self._snowball_rows(ctx, snowball)
                 rb.add_table(
-                    headers=["Sensitivity", "Value", "Interpretation"],
+                    headers=[
+                        t("section.sensitivity.col.sensitivity"),
+                        t("section.sensitivity.col.value"),
+                        t("section.sensitivity.col.interpretation"),
+                    ],
                     rows=rows,
-                    caption=(
-                        "Local partial derivatives ∂(output)/∂(input) at the "
-                        "current design point."
-                    ),
+                    caption=t("section.sensitivity.snowball.caption"),
                 )
 
     # ── helpers ────────────────────────────────────────────────────────────
 
     @staticmethod
     def _snowball_rows(
-        snowball, propulsion, dc,
+        ctx: ReportContext, snowball,
     ) -> list[list[str]]:
         """Build the snowball-factor table rows, display-converted in both
         numerator and denominator (matches the live snowball widget)."""
+        t = ctx.t
+        propulsion = ctx.brief.propulsion_type
+        dc = ctx.display_converter
+        cannot_compute = t("section.sensitivity.snowball.cannot_compute")
         rows: list[list[str]] = []
         for f in snowball.factors:
-            out_label = display_label_for_output(f.output_id, propulsion)
-            in_label  = display_label_for_parameter(f.parameter, propulsion)
+            out_label = t(output_label_key(f.output_id, propulsion))
+            in_label  = t(parameter_label_key(f.parameter))
 
             # Output factor / unit
             out_kind = unit_kind_for_output(f.output_id, propulsion)
@@ -344,13 +355,20 @@ class SensitivityAnalysisSection(ReportSection[SensitivityReportConfig]):
 
             symbol = f"∂{out_label} / ∂{in_label}"
             if f.value is None or in_factor == 0:
-                rows.append([symbol, "—", "Could not compute"])
+                rows.append([symbol, "—", cannot_compute])
                 continue
             display_value = f.value * out_factor / in_factor
-            sign = "increase" if display_value >= 0 else "decrease"
-            interp = (
-                f"Each +1 {in_unit} of {in_label} → "
-                f"{sign} of {abs(display_value):.3g} {out_unit} in {out_label}"
+            sign_key = (
+                "section.sensitivity.snowball.sign.increase"
+                if display_value >= 0
+                else "section.sensitivity.snowball.sign.decrease"
+            )
+            interp = t(
+                "section.sensitivity.snowball.interpretation",
+                in_unit=in_unit, input=in_label,
+                sign=t(sign_key),
+                value=f"{abs(display_value):.3g}",
+                out_unit=out_unit, output=out_label,
             )
             rows.append([
                 symbol,

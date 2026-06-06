@@ -899,3 +899,226 @@ msgstr ""
 "تم إنشاء هذا التقرير بواسطة تطبيق UAV-CD-APP "
 "(Python 3.14, PyQt6, pyqtgraph, numpy, scipy, python-docx, matplotlib). "
 "يتبع تحليل القيود قسم 2.9 من Sadraey بدقة؛ وتقدير الوزن يتبع 2.6-2.7."
+
+# ── Sensitivity analysis (PR6) ─────────────────────────────────────────────
+
+msgid "section.sensitivity.title"
+msgstr "تحليل حساسية التصميم"
+
+msgid "section.sensitivity.intro"
+msgstr ""
+"يقيس تحليل الحساسية مدى استجابة التصميم لعدم اليقين في كل متطلب ومعامل "
+"أيروديناميكي. تستند المنهجية إلى Raymer (2018) الفصل 19 (مخططات تورنادو "
+"ودراسات المفاضلة)، وSadraey (2020) القسم 2.10 (مشتقات وزن الإقلاع)، "
+"وKeane وآخرون (2017) الفصل 4 (تحليل الحساسية التمهيدي)."
+
+msgid "section.sensitivity.no_design_point"
+msgstr ""
+"يتطلب محتوى الحساسية وجود نقطة تصميم محسوبة — قم بتشغيل تحجيم الطائرة "
+"من تبويب General قبل التصدير."
+
+msgid "section.sensitivity.empty_config"
+msgstr ""
+"تم تكوين القسم بدون أي محتوى (لا توجد مخططات تورنادو، ولا تمشيطات، "
+"ومنحنيات الهامش والكرة الثلجية معطلة)."
+
+msgid "section.sensitivity.no_coeffs"
+msgstr "معاملات الانحدار غير متوفرة — تم التخطي."
+
+# ── Tornado ────────────────────────────────────────────────────────────────
+
+msgid "section.sensitivity.heading.tornado"
+msgstr "تورنادو — {output}"
+
+msgid "section.sensitivity.tornado.caption"
+msgstr ""
+"مخطط تورنادو لتأثير المدخلات على {output} (اضطراب ±{delta:.0f} ٪، مرتب "
+"بحسب الحجم)."
+
+msgid "section.sensitivity.tornado.render_failed"
+msgstr "تعذر رسم مخطط التورنادو لـ {output}."
+
+# ── Sweep ──────────────────────────────────────────────────────────────────
+
+msgid "section.sensitivity.heading.sweep"
+msgstr "تمشيط — {output} مقابل {input}"
+
+msgid "section.sensitivity.sweep.caption"
+msgstr ""
+"تمشيط OAT للمخرج {output} عند تغيير {input} بنسبة ±{delta:.0f} ٪ حول "
+"نقطة التصميم."
+
+msgid "section.sensitivity.sweep.render_failed"
+msgstr "تعذر رسم منحنى التمشيط لـ {output} مقابل {input}."
+
+# ── Constraint margins ─────────────────────────────────────────────────────
+
+msgid "section.sensitivity.heading.margins"
+msgstr "هوامش القيود"
+
+msgid "section.sensitivity.margins.violated"
+msgstr "مخالف: {constraint} ({margin:+.1f} ٪)."
+
+msgid "section.sensitivity.margins.binding"
+msgstr ""
+"القيد الحاكم: {constraint} — هامش {margin:.1f} ٪ (أول من يضيق عند "
+"تشديد المتطلبات)."
+
+msgid "section.sensitivity.margins.caption"
+msgstr "هوامش القيود عند نقطة التصميم."
+
+msgid "section.sensitivity.col.constraint"
+msgstr "القيد"
+
+msgid "section.sensitivity.col.margin"
+msgstr "الهامش"
+
+msgid "section.sensitivity.col.severity"
+msgstr "الخطورة"
+
+msgid "section.sensitivity.severity.critical"
+msgstr "حرج"
+
+msgid "section.sensitivity.severity.tight"
+msgstr "ضيق"
+
+msgid "section.sensitivity.severity.ok"
+msgstr "جيد"
+
+# ── Snowball factors ───────────────────────────────────────────────────────
+
+msgid "section.sensitivity.heading.snowball"
+msgstr "قواعد التصميم العامة (معاملات كرة الثلج)"
+
+msgid "section.sensitivity.snowball.no_coeffs"
+msgstr "معاملات الانحدار غير متوفرة — تم تخطي معاملات كرة الثلج."
+
+msgid "section.sensitivity.snowball.caption"
+msgstr "المشتقات الجزئية المحلية ∂(المخرج)/∂(المدخل) عند نقطة التصميم الحالية."
+
+msgid "section.sensitivity.col.sensitivity"
+msgstr "الحساسية"
+
+msgid "section.sensitivity.col.value"
+msgstr "القيمة"
+
+msgid "section.sensitivity.col.interpretation"
+msgstr "التفسير"
+
+msgid "section.sensitivity.snowball.interpretation"
+msgstr "كل ‎+1 {in_unit} من {input} ← {sign} بمقدار {value} {out_unit} في {output}"
+
+msgid "section.sensitivity.snowball.sign.increase"
+msgstr "زيادة"
+
+msgid "section.sensitivity.snowball.sign.decrease"
+msgstr "نقصان"
+
+msgid "section.sensitivity.snowball.cannot_compute"
+msgstr "تعذرت الحساب"
+
+# ── Output catalogue labels (propulsion-aware variants below) ─────────────
+
+msgid "sens.output.mtow"
+msgstr "MTOW"
+
+msgid "sens.output.wing_area"
+msgstr "مساحة الجناح (S)"
+
+msgid "sens.output.engine_power"
+msgstr "قدرة المحرك"
+
+msgid "sens.output.engine_thrust"
+msgstr "دفع المحرك"
+
+msgid "sens.output.wingspan"
+msgstr "باع الجناح (b)"
+
+msgid "sens.output.empty_weight"
+msgstr "الوزن الفارغ"
+
+msgid "sens.output.empty_weight_fraction"
+msgstr "نسبة الوزن الفارغ"
+
+msgid "sens.output.ld_max"
+msgstr "(L/D) max"
+
+msgid "sens.output.cl_cruise"
+msgstr "CL* (طيران مستقر)"
+
+msgid "sens.output.wing_loading"
+msgstr "تحميل الجناح W/S"
+
+msgid "sens.output.power_loading"
+msgstr "تحميل القدرة W/P"
+
+msgid "sens.output.thrust_loading"
+msgstr "تحميل الدفع T/W"
+
+msgid "sens.output.fuel_mass"
+msgstr "كتلة الوقود"
+
+msgid "sens.output.battery_mass"
+msgstr "كتلة البطارية"
+
+msgid "sens.output.hybrid_energy_mass"
+msgstr "كتلة الوقود + البطارية"
+
+msgid "sens.output.fuel_fraction"
+msgstr "نسبة الوقود"
+
+msgid "sens.output.battery_fraction"
+msgstr "نسبة البطارية"
+
+msgid "sens.output.hybrid_energy_fraction"
+msgstr "نسبة الوقود + البطارية"
+
+# ── Parameter labels ───────────────────────────────────────────────────────
+
+msgid "sens.param.payload_mass"
+msgstr "كتلة الحمولة"
+
+msgid "sens.param.cruise_speed"
+msgstr "سرعة الطيران المستقر"
+
+msgid "sens.param.stall_speed"
+msgstr "سرعة التوقف"
+
+msgid "sens.param.max_speed"
+msgstr "السرعة القصوى"
+
+msgid "sens.param.rate_of_climb"
+msgstr "معدل الصعود"
+
+msgid "sens.param.cruise_altitude"
+msgstr "ارتفاع الطيران المستقر"
+
+msgid "sens.param.service_ceiling"
+msgstr "سقف الخدمة"
+
+msgid "sens.param.takeoff_run"
+msgstr "مسافة الإقلاع"
+
+msgid "sens.param.aspect_ratio"
+msgstr "النسبة الباعية (AR)"
+
+msgid "sens.param.c_d0"
+msgstr "CD₀"
+
+msgid "sens.param.c_l_max"
+msgstr "CL max"
+
+msgid "sens.param.oswald"
+msgstr "كفاءة Oswald (e)"
+
+msgid "sens.param.prop_efficiency"
+msgstr "الكفاءة الدافعية (ηₚ)"
+
+msgid "sens.param.sfc"
+msgstr "SFC"
+
+msgid "sens.param.battery_energy_density"
+msgstr "كثافة طاقة البطارية"
+
+msgid "sens.param.battery_efficiency"
+msgstr "كفاءة البطارية"

@@ -23,6 +23,8 @@ match what the user sees in the sizing tabs.
 from app.core.sensitivity.labels import (
     display_label_for_output,
     display_label_for_parameter,
+    output_label_key,
+    parameter_label_key,
     unit_kind_for_output,
     unit_kind_for_parameter,
 )
@@ -70,6 +72,8 @@ __all__ = [
     # labels + unit-kind resolution
     "display_label_for_output",
     "display_label_for_parameter",
+    "output_label_key",
+    "parameter_label_key",
     "unit_kind_for_output",
     "unit_kind_for_parameter",
     # inclusion predicates

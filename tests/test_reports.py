@@ -1058,6 +1058,47 @@ class TestSensitivityReportSection:
         # Positive check: at least one tornado figure caption is present.
         assert "Tornado of input impact" in body
 
+    def test_arabic_export_translates_sensitivity_section(
+        self, sized_store, tmp_path,
+    ):
+        """Arabic export must use the AR catalogue for the sensitivity
+        section's headings and tables. Failure mode would be the EN
+        msgid leaking into the output.
+
+        lxml renders non-ASCII as XML numeric entities (``&#NNNN;``),
+        so a substring search has to use the same encoding to find the
+        Arabic text in the body.
+        """
+        from app.core.i18n import Language
+
+        def _to_xml_entities(s: str) -> str:
+            return "".join(
+                c if ord(c) < 128 else f"&#{ord(c)};" for c in s
+            )
+
+        out = tmp_path / "sens_ar.docx"
+        cfg = ReportConfig(
+            report_title="Sens AR",
+            author="Test",
+            revision="1.0",
+            format=ExportFormat.DOCX,
+            sections=SectionRegistry.default_manifest(),
+            output_path=str(out),
+            language=Language.AR,
+        )
+        ok, _ = ExportService(sized_store).export(cfg, figure_grabbers={})
+        assert ok
+        doc = Document(str(out))
+        body = etree.tostring(doc.element).decode("utf-8")
+        # Arabic section heading "تحليل حساسية التصميم"
+        assert _to_xml_entities("تحليل حساسية التصميم") in body
+        # Arabic margins + snowball headings
+        assert _to_xml_entities("هوامش القيود") in body
+        assert _to_xml_entities("قواعد التصميم العامة") in body
+        # English msgids must NOT leak
+        assert "Design Sensitivity Analysis" not in body
+        assert "Constraint Margins" not in body
+
     def test_custom_config_with_sweep_emits_sweep_heading(
         self, sized_store, tmp_path,
     ):

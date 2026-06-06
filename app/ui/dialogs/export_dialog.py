@@ -46,12 +46,16 @@ from PyQt6.QtWidgets import (
 from app.core.i18n import Language
 from app.core.reports.base import SectionEntry, SectionRegistry
 from app.core.reports.renderer import ExportFormat, ReportConfig
+from app.core.reports.sections.sensitivity_analysis import (
+    SensitivityReportConfig,
+)
 
 # Trigger auto-registration of all sections
 import app.core.reports.sections  # noqa: F401
 
 from app.services.export_service import ExportService
 from app.state.store import AppStore
+from app.ui.dialogs.section_customize_dialog import SectionCustomizeDialog
 
 _LOG = logging.getLogger(__name__)
 
@@ -84,11 +88,26 @@ class _ExportWorker(QObject):
 # ===========================================================================
 
 class _SectionRow(QWidget):
-    """One row in the sections list: grip + checkbox + category badge."""
+    """One row in the sections list: grip + checkbox + customise + badge.
 
-    def __init__(self, entry: SectionEntry, title: str, description: str,
-                 category_label: str,
-                 parent: Optional[QWidget] = None) -> None:
+    Customisable sections (``cls.is_customizable == True``) carry a
+    "⚙ Customise…" button that fires ``customise_requested(entry)``;
+    the parent dialog handles the per-section dispatch. A small
+    "★ <summary>" badge appears next to the title when
+    ``entry.config is not None``, summarising the user's picks.
+    """
+
+    customise_requested = pyqtSignal(object)   # SectionEntry payload
+
+    def __init__(
+        self,
+        entry: SectionEntry,
+        title: str,
+        description: str,
+        category_label: str,
+        is_customizable: bool = False,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self._entry = entry
         layout = QHBoxLayout(self)
@@ -112,6 +131,27 @@ class _SectionRow(QWidget):
         self._check.toggled.connect(self._on_toggle)
         layout.addWidget(self._check, stretch=1)
 
+        # Customisation summary badge (visible only when entry.config set)
+        self._summary_lbl = QLabel("")
+        self._summary_lbl.setStyleSheet(
+            "color: #1A5C96; font-size: 10px; font-style: italic; "
+            "background: transparent;"
+        )
+        self._refresh_summary_badge()
+        layout.addWidget(self._summary_lbl)
+
+        # Customise button — only shown for sections that opt in
+        if is_customizable:
+            customise_btn = QPushButton("⚙  Customise…")
+            customise_btn.setObjectName("SecondaryButton")
+            customise_btn.setToolTip(
+                f"Customise the {title} section's content."
+            )
+            customise_btn.clicked.connect(
+                lambda: self.customise_requested.emit(self._entry)
+            )
+            layout.addWidget(customise_btn)
+
         # Category badge
         badge = QLabel(category_label)
         badge.setStyleSheet(
@@ -121,6 +161,21 @@ class _SectionRow(QWidget):
 
     def _on_toggle(self, checked: bool) -> None:
         self._entry.enabled = checked
+
+    def _refresh_summary_badge(self) -> None:
+        """Update the "★ <summary>" badge from entry.config (or hide if
+        the section is using its default configuration)."""
+        if self._entry.config is not None:
+            self._summary_lbl.setText(
+                f"★ {self._entry.config.summary()}"
+            )
+        else:
+            self._summary_lbl.setText("")
+
+    def refresh(self) -> None:
+        """Public refresh hook so the parent dialog can update the badge
+        after a successful customise dialog."""
+        self._refresh_summary_badge()
 
     @property
     def entry(self) -> SectionEntry:
@@ -280,7 +335,10 @@ class ExportDialog(QDialog):
             row_widget = _SectionRow(
                 entry, cls.title, cls.description,
                 cls.category.value,
+                is_customizable=cls.is_customizable,
             )
+            if cls.is_customizable:
+                row_widget.customise_requested.connect(self._open_customise)
             item = QListWidgetItem(self._list)
             item.setSizeHint(row_widget.sizeHint())
             self._list.setItemWidget(item, row_widget)
@@ -322,6 +380,45 @@ class ExportDialog(QDialog):
         for entry in self._entries:
             entry.enabled = checked
         self._populate_sections(selected_row=self._list.currentRow())
+
+    # ── Customise dispatch ────────────────────────────────────────────────
+
+    def _open_customise(self, entry: SectionEntry) -> None:
+        """Open the customise dialog appropriate for ``entry.section_id``.
+
+        Today the dispatch table has exactly one entry. When a second
+        customisable section appears, add one branch here — the
+        per-section dialog hierarchy keeps each implementation isolated.
+        """
+        dlg: Optional[SectionCustomizeDialog] = None
+        if entry.section_id == "sensitivity_analysis":
+            from app.ui.dialogs.sensitivity_report_dialog import (
+                SensitivityReportConfigDialog,
+            )
+            initial = (
+                entry.config
+                if isinstance(entry.config, SensitivityReportConfig)
+                else None
+            )
+            dlg = SensitivityReportConfigDialog(
+                self._store, initial_config=initial, parent=self,
+            )
+        else:
+            _LOG.warning(
+                "No customise dialog registered for section_id=%r",
+                entry.section_id,
+            )
+            return
+
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.config is not None:
+            entry.config = dlg.config
+            # Refresh the row's "★ <summary>" badge.
+            for i in range(self._list.count()):
+                item = self._list.item(i)
+                row = self._list.itemWidget(item)
+                if isinstance(row, _SectionRow) and row.entry is entry:
+                    row.refresh()
+                    break
 
     def _browse(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

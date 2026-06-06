@@ -144,3 +144,53 @@ def unit_kind_for_parameter(parameter: SweepableParameter) -> str:
     if fn in ("cruise_altitude_m", "service_ceiling_m", "takeoff_run_m"):
         return "altitude"
     return _UNIT_KIND_RATIO
+
+
+# ── i18n key resolvers ─────────────────────────────────────────────────────
+#
+# Live widgets use ``display_label_for_output`` which returns an English
+# string (the UI itself is English-only per the project plan). Report
+# sections need a translated label instead — they look up the right
+# catalogue key here and pass it through ``ctx.t(...)``. The key choice
+# is propulsion-aware for outputs whose semantics flip per propulsion;
+# for stable outputs it falls back to ``OutputSpec.label_key``.
+
+
+def output_label_key(
+    output_id: str,
+    propulsion_type: PropulsionType,
+) -> str:
+    """Return the gettext key for an output's translated label.
+
+    Propulsion-aware: engine_power_w → ``sens.output.engine_power`` for
+    prop modes, ``sens.output.engine_thrust`` for jets. Same logic for
+    power_loading_nw, w_fuel_or_battery_kg, fuel_battery_fraction.
+    Stable outputs return their ``OutputSpec.label_key``.
+    """
+    if output_id == "engine_power_w":
+        return ("sens.output.engine_power"
+                if propulsion_type.is_power_mode
+                else "sens.output.engine_thrust")
+    if output_id == "power_loading_nw":
+        return ("sens.output.power_loading"
+                if propulsion_type.is_power_mode
+                else "sens.output.thrust_loading")
+    if output_id == "w_fuel_or_battery_kg":
+        if propulsion_type is PropulsionType.HYBRID:
+            return "sens.output.hybrid_energy_mass"
+        return ("sens.output.battery_mass"
+                if propulsion_type.is_electric
+                else "sens.output.fuel_mass")
+    if output_id == "fuel_battery_fraction":
+        if propulsion_type is PropulsionType.HYBRID:
+            return "sens.output.hybrid_energy_fraction"
+        return ("sens.output.battery_fraction"
+                if propulsion_type.is_electric
+                else "sens.output.fuel_fraction")
+    spec = OUTPUT_CATALOG.get(output_id)
+    return spec.label_key if spec is not None else f"sens.output.{output_id}"
+
+
+def parameter_label_key(parameter: SweepableParameter) -> str:
+    """Return the gettext key for a sweep parameter's translated label."""
+    return parameter.label_key
