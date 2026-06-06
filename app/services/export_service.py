@@ -32,6 +32,7 @@ from app.core.i18n import load_translator
 from app.core.reports.base import ReportContext, SectionRegistry, SectionEntry
 from app.core.reports.renderer import ExportFormat, ReportConfig
 from app.core.reports.renderers.docx_renderer import DocxBuilder
+from app.services.coeffs_resolver import resolve_active_coeffs
 from app.services.figure_renderers import (
     render_matching_diagram_png,
     render_mission_profile_png,
@@ -125,9 +126,12 @@ class ExportService:
             weight_result=sizing.weight_result,
             constraint_result=sizing.constraint_result,
             design_point=sizing.design_point,
-            regression_coeffs=state.historical_data.regression_coefficients.get(
-                sizing.brief.propulsion_type.name.lower()
-            ) if state.historical_data.regression_coefficients else None,
+            # Resolve via the shared helper — the previous inline lookup
+            # keyed on ``propulsion_type.name.lower()``, which never
+            # matched the dict's ``classification_name`` keys, so
+            # ``ctx.regression_coeffs`` was always None and the
+            # sensitivity figures silently skipped at export time.
+            regression_coeffs=resolve_active_coeffs(self._store, sizing.brief),
             matching_diagram_png=matching_png,
             mission_profile_png=mission_png,
             weight_pie_chart_png=weight_pie,
@@ -155,7 +159,20 @@ class ExportService:
         ctx: ReportContext,
         rb,
     ) -> None:
+        # Index entries by id so we can hand each section its per-export
+        # customisation payload (or fall back to the section's default).
+        entries_by_id: dict[str, SectionEntry] = {
+            e.section_id: e for e in config.sections
+        }
         sections = SectionRegistry.enabled_sections(config.sections)
         for section_cls in sections:
-            section_cls().build(ctx, rb)
+            entry = entries_by_id.get(section_cls.section_id)
+            section_config = entry.config if entry else None
+            if section_config is None:
+                section_config = section_cls.default_config(ctx)
+            # Drop choices that don't apply to the current brief
+            # (propulsion-gated inputs, etc.) before render.
+            if section_config is not None:
+                section_config = section_config.validate(ctx.brief)
+            section_cls(config=section_config).build(ctx, rb)
             rb.add_horizontal_rule()

@@ -104,23 +104,18 @@ class SizingService(QObject):
         """
         brief: DesignBrief = self._store.state.sizing.brief
 
-        # 1 — Get regression coefficients
-        coeffs: Optional[RegressionCoeffs] = (
-            self._store.state.historical_data
-            .regression_coefficients
-            .get(brief.classification_name)
+        # 1 — Get regression coefficients via the shared resolver
+        # (same logic ExportService and SensitivityService rely on).
+        from app.services.coeffs_resolver import resolve_active_coeffs
+        coeffs: Optional[RegressionCoeffs] = resolve_active_coeffs(
+            self._store, brief,
         )
         if coeffs is None:
             _LOG.warning(
-                "No regression coefficients for class '%s'. "
-                "Falling back to textbook defaults.",
+                "No regression coefficients (database OR textbook) for "
+                "class '%s'. Sizing pipeline may fail.",
                 brief.classification_name,
             )
-            from app.core.coefficients import get_closest_textbook
-            hd = self._store.state.historical_data
-            cr = hd.find_range_for_mtow(brief.payload_mass_kg * 5)
-            mid = (cr.min_mtow_kg + cr.max_mtow_kg) / 2 if cr else None
-            coeffs = get_closest_textbook(brief.classification_name, mid)
 
         try:
             # 2 — Weight buildup

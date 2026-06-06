@@ -20,5 +20,6 @@ from app.core.reports.sections.constraint_status    import ConstraintStatusSecti
 from app.core.reports.sections.design_point_summary import DesignPointSummarySection   # noqa: F401
 from app.core.reports.sections.aerodynamic_parameters import AerodynamicParametersSection  # noqa: F401
 from app.core.reports.sections.sanity_checks        import SanityChecksSection         # noqa: F401
+from app.core.reports.sections.sensitivity_analysis import SensitivityAnalysisSection   # noqa: F401
 from app.core.reports.sections.appendix_inputs      import AppendixInputsSection       # noqa: F401
 from app.core.reports.sections.appendix_references  import AppendixReferencesSection   # noqa: F401

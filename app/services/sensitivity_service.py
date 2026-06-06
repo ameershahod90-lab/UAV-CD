@@ -18,7 +18,6 @@ from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from app.core.coefficients import get_closest_textbook
 from app.core.entities import DesignBrief, RegressionCoeffs
 from app.core.sensitivity import (
     MarginsReport,
@@ -213,16 +212,11 @@ class SensitivityService(QObject):
             return False
 
     def _current_coeffs(self) -> Optional[RegressionCoeffs]:
-        """Resolve the active regression coefficients (same logic as SizingService)."""
-        brief = self._store.state.sizing.brief
-        coeffs = (
-            self._store.state.historical_data
-            .regression_coefficients
-            .get(brief.classification_name)
-        )
-        if coeffs is None:
-            hd = self._store.state.historical_data
-            cr = hd.find_range_for_mtow(brief.payload_mass_kg * 5)
-            mid = (cr.min_mtow_kg + cr.max_mtow_kg) / 2 if cr else None
-            coeffs = get_closest_textbook(brief.classification_name, mid)
-        return coeffs
+        """Resolve the active regression coefficients.
+
+        Delegates to the shared ``resolve_active_coeffs`` helper so the
+        same rule (database lookup → textbook fallback) applies
+        everywhere — SizingService, SensitivityService, ExportService.
+        """
+        from app.services.coeffs_resolver import resolve_active_coeffs
+        return resolve_active_coeffs(self._store, self._store.state.sizing.brief)

@@ -116,8 +116,9 @@ def _export(store: AppStore, out_path: Path) -> tuple[bool, str]:
 
 
 class TestSectionRegistry:
-    def test_thirteen_sections_registered(self):
-        assert len(SectionRegistry.all_sections()) == 13
+    def test_all_sections_registered(self):
+        # 13 original sections + 1 customisable Sensitivity Analysis (PR6).
+        assert len(SectionRegistry.all_sections()) == 14
 
     def test_section_ids_unique(self):
         ids = [s.section_id for s in SectionRegistry.all_sections()]
@@ -681,17 +682,21 @@ class TestServerSideFigureRenderers:
                 f"Pie chart for {prop.name} is missing or too small"
             )
 
-    def test_export_embeds_all_three_figures(self, sized_store, tmp_path):
-        """End-to-end: the exported .docx now contains 3 inline shapes —
-        matching diagram, mission profile, and weight pie chart."""
+    def test_export_embeds_all_figures(self, sized_store, tmp_path):
+        """End-to-end: the exported .docx contains at least the three
+        legacy figures (matching diagram, mission profile, weight pie
+        chart) plus the sensitivity section's tornado figures (3 by
+        default — one per ``sens_tornado_output_ids`` slot)."""
         out = tmp_path / "with_figures.docx"
         ok, msg = _export(sized_store, out)
         assert ok, msg
         doc = Document(str(out))
-        # Each figure becomes one inline shape
-        assert len(doc.inline_shapes) == 3, (
-            f"Expected 3 figures (matching, mission, pie); "
-            f"found {len(doc.inline_shapes)}"
+        n_shapes = len(doc.inline_shapes)
+        # Each figure becomes one inline shape: 3 legacy + 3 default
+        # sensitivity tornados = 6.
+        assert n_shapes == 6, (
+            f"Expected 6 figures (3 legacy + 3 default sensitivity "
+            f"tornados); found {n_shapes}"
         )
 
 
@@ -938,3 +943,321 @@ class TestIncludeEquationsToggle:
         assert len(eq_labels_on) >= 5, (
             f"Expected auto-numbered equation labels; only found {eq_labels_on}"
         )
+
+
+# ── Sensitivity Analysis section (PR6 Slice 1) ──────────────────────────────
+
+
+class TestSensitivityReportSection:
+    """The sensitivity_analysis section ships with a SectionConfig payload
+    that the export dialog can customise. These tests cover (1) the
+    abstraction (SectionConfig.validate filters propulsion-gated inputs),
+    (2) the section's default config (the live page's tornado slots), and
+    (3) the end-to-end export pipeline emitting a docx whose body contains
+    the expected headings and figure refs.
+    """
+
+    def test_default_config_matches_studio_tornado_slots(self, sized_store):
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityAnalysisSection,
+            SensitivityReportConfig,
+        )
+        ctx = _build_context(sized_store)
+        cfg = SensitivityAnalysisSection.default_config(ctx)
+        assert isinstance(cfg, SensitivityReportConfig)
+        assert cfg.tornado_output_ids == sized_store.settings.sens_tornado_output_ids
+        assert cfg.sweep_specs == ()                # empty by default
+        assert cfg.include_margins is True
+        assert cfg.include_snowball is True
+
+    def test_validate_drops_propulsion_gated_sweep_input(self, sized_store):
+        """SFC is gated to ``uses_fuel`` — an Electric brief must drop it."""
+        import dataclasses
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityReportConfig,
+        )
+        cfg = SensitivityReportConfig(
+            tornado_output_ids=("mtow_kg",),
+            sweep_specs=(
+                ("mtow_kg", "payload_mass_kg"),               # universal — keeps
+                ("mtow_kg", "specific_fuel_consumption_g_wh"),  # fuel-only — drops
+            ),
+        )
+        # Default brief is Electric — second sweep spec must disappear.
+        cleaned = cfg.validate(sized_store.state.sizing.brief)
+        assert cleaned.tornado_output_ids == ("mtow_kg",)
+        assert cleaned.sweep_specs == (("mtow_kg", "payload_mass_kg"),)
+
+    def test_validate_drops_unknown_output_id(self, sized_store):
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityReportConfig,
+        )
+        cfg = SensitivityReportConfig(
+            tornado_output_ids=("mtow_kg", "does_not_exist"),
+        )
+        cleaned = cfg.validate(sized_store.state.sizing.brief)
+        assert cleaned.tornado_output_ids == ("mtow_kg",)
+
+    def test_summary_describes_picks(self, sized_store):
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityReportConfig,
+        )
+        cfg = SensitivityReportConfig(
+            tornado_output_ids=("mtow_kg", "wing_area_m2"),
+            sweep_specs=(("mtow_kg", "payload_mass_kg"),),
+        )
+        summary = cfg.summary()
+        assert "2 tornados" in summary
+        assert "1 sweep" in summary
+        assert "margins" in summary
+        assert "snowball" in summary
+
+    def test_summary_empty(self):
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityReportConfig,
+        )
+        cfg = SensitivityReportConfig(
+            tornado_output_ids=(),
+            sweep_specs=(),
+            include_margins=False,
+            include_snowball=False,
+        )
+        assert cfg.summary() == "(empty)"
+
+    def test_section_class_metadata(self):
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityAnalysisSection,
+        )
+        assert SensitivityAnalysisSection.section_id == "sensitivity_analysis"
+        assert SensitivityAnalysisSection.is_customizable is True
+        assert SensitivityAnalysisSection.default_order == 95
+        # Slots after sanity_checks(90), before appendix_inputs(100).
+
+    def test_default_export_includes_sensitivity_headings(
+        self, sized_store, tmp_path,
+    ):
+        ok, _ = _export(sized_store, tmp_path / "sens_default.docx")
+        assert ok
+        doc = Document(str(tmp_path / "sens_default.docx"))
+        body = etree.tostring(doc.element).decode("utf-8")
+        assert "Design Sensitivity Analysis" in body
+        assert "Constraint Margins" in body
+        assert "Snowball Factors" in body
+        # Default config has no sweeps — no "Sweep …" sub-heading.
+        # Heading uses an em-dash that lxml renders as `&#8212;`.
+        assert "Sweep &#8212;" not in body
+        # Regression: a default export of a sized store must successfully
+        # resolve coeffs (database lookup → textbook fallback). If
+        # ``ctx.regression_coeffs`` is None, the section emits the
+        # "Regression coefficients unavailable — skipped." note and the
+        # tornado / snowball content silently disappears.
+        assert "Regression coefficients unavailable" not in body, (
+            "ctx.regression_coeffs is None — coeffs resolution is broken; "
+            "see app/services/coeffs_resolver.py"
+        )
+        # Positive check: at least one tornado figure caption is present.
+        assert "Tornado of input impact" in body
+
+    def test_custom_config_with_sweep_emits_sweep_heading(
+        self, sized_store, tmp_path,
+    ):
+        from app.core.reports.base import SectionEntry
+        from app.core.reports.sections.sensitivity_analysis import (
+            SensitivityReportConfig,
+        )
+        manifest = SectionRegistry.default_manifest()
+        for entry in manifest:
+            if entry.section_id == "sensitivity_analysis":
+                entry.config = SensitivityReportConfig(
+                    tornado_output_ids=("mtow_kg",),
+                    sweep_specs=(("mtow_kg", "payload_mass_kg"),),
+                    include_margins=True,
+                    include_snowball=False,
+                )
+        cfg = ReportConfig(
+            report_title="Sens custom",
+            author="Test",
+            revision="1.0",
+            format=ExportFormat.DOCX,
+            sections=manifest,
+            output_path=str(tmp_path / "sens_custom.docx"),
+        )
+        ok, _ = ExportService(sized_store).export(cfg, figure_grabbers={})
+        assert ok
+        doc = Document(str(tmp_path / "sens_custom.docx"))
+        body = etree.tostring(doc.element).decode("utf-8")
+        # Custom: 1 tornado, 1 sweep, margins yes, snowball NO.
+        # lxml's tostring renders the em-dash as the XML numeric entity
+        # `&#8212;`, so match either the entity-encoded form or a unique
+        # plain-text substring of the heading.
+        assert ("Sweep &#8212;" in body
+                or "MTOW vs Payload Mass" in body), \
+            "expected 'Sweep ... MTOW vs Payload Mass' heading in docx"
+        assert "Constraint Margins" in body
+        assert "Snowball Factors" not in body
+
+
+# ── Shared coeffs resolver (PR6 hotfix) ─────────────────────────────────────
+
+
+class TestCoeffsResolver:
+    """``resolve_active_coeffs`` is the single source of truth for picking
+    regression coefficients across SizingService, SensitivityService, and
+    ExportService. Without it the bug-of-the-day was: ExportService keyed
+    by ``propulsion_type.name.lower()`` (always missed), causing every
+    sensitivity-section figure and the snowball table to silently skip.
+    """
+
+    def test_resolver_returns_textbook_fallback_when_database_empty(
+        self, sized_store,
+    ):
+        from app.services.coeffs_resolver import resolve_active_coeffs
+        coeffs = resolve_active_coeffs(
+            sized_store, sized_store.state.sizing.brief,
+        )
+        assert coeffs is not None, (
+            "Resolver must fall back to textbook coefficients when the "
+            "database carries nothing for the current classification."
+        )
+
+    def test_export_context_carries_resolved_coeffs(self, sized_store):
+        """ReportContext.regression_coeffs must be populated for any
+        sized store — without it the sensitivity section silently
+        skips its figures and snowball table.
+
+        Goes through ``ExportService._build_context`` (the production
+        path) rather than the test-local ``_build_context`` helper,
+        which legacy code paths hardcoded to None.
+        """
+        cfg = ReportConfig(
+            report_title="t", author="t", revision="1",
+            format=ExportFormat.DOCX,
+            sections=SectionRegistry.default_manifest(),
+            output_path="/tmp/x.docx",
+        )
+        ctx = ExportService(sized_store)._build_context(cfg)
+        assert ctx.regression_coeffs is not None
+
+
+# ── SectionConfig abstraction (PR6 Slice 1) ─────────────────────────────────
+
+
+class TestSectionConfigBase:
+    """The SectionConfig abstract base + SectionEntry typing."""
+
+    def test_base_validate_default_passthrough(self, sized_store):
+        from app.core.reports.base import SectionConfig
+
+        class _Empty(SectionConfig):
+            pass
+
+        e = _Empty()
+        assert e.validate(sized_store.state.sizing.brief) is e
+
+    def test_section_entry_config_field_typed(self):
+        """SectionEntry.config must be Optional[SectionConfig], not Any."""
+        from app.core.reports.base import SectionConfig, SectionEntry
+        from typing import get_type_hints
+        hints = get_type_hints(SectionEntry)
+        # Optional[SectionConfig] == Union[SectionConfig, None]
+        config_hint = hints["config"]
+        assert SectionConfig in getattr(config_hint, "__args__", ())
+
+    def test_report_section_default_config_returns_none_by_default(
+        self, sized_store,
+    ):
+        """Non-customisable sections inherit default_config returning None."""
+        from app.core.reports.sections.matching_diagram import (
+            MatchingDiagramSection,
+        )
+        ctx = _build_context(sized_store)
+        assert MatchingDiagramSection.default_config(ctx) is None
+
+
+# ── Tornado / sweep figure renderers (PR6 Slice 1) ──────────────────────────
+
+
+class TestSensitivityFigureRenderers:
+    def test_render_tornado_returns_png_bytes(self, sized_store):
+        from app.core.coefficients import get_closest_textbook
+        from app.core.sensitivity import (
+            compute_tornado,
+            sweepable_parameters_for,
+        )
+        from app.services.figure_renderers import render_tornado_png
+
+        brief  = sized_store.state.sizing.brief
+        coeffs = get_closest_textbook(
+            brief.classification_name, brief.payload_mass_kg * 5,
+        )
+        td = compute_tornado(
+            brief, coeffs,
+            sweepable_parameters_for(brief), "mtow_kg",
+        )
+        png = render_tornado_png(
+            td, brief.propulsion_type,
+            DisplayConverter(sized_store.settings),
+        )
+        assert png is not None and len(png) > 1000
+        # PNG signature
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_render_sweep_single_output_returns_png(self, sized_store):
+        from app.core.coefficients import get_closest_textbook
+        from app.core.sensitivity import (
+            run_oat_sweep,
+            sweepable_parameters_for,
+        )
+        from app.services.figure_renderers import render_sweep_png
+
+        brief  = sized_store.state.sizing.brief
+        coeffs = get_closest_textbook(
+            brief.classification_name, brief.payload_mass_kg * 5,
+        )
+        param = next(
+            p for p in sweepable_parameters_for(brief)
+            if p.field_name == "payload_mass_kg"
+        )
+        sweep = run_oat_sweep(brief, coeffs, param, n_points=11)
+        png = render_sweep_png(
+            sweep, ["mtow_kg"],
+            brief.propulsion_type,
+            DisplayConverter(sized_store.settings),
+        )
+        assert png is not None and len(png) > 1000
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_render_sweep_multi_output_returns_png(self, sized_store):
+        from app.core.coefficients import get_closest_textbook
+        from app.core.sensitivity import (
+            run_oat_sweep,
+            sweepable_parameters_for,
+        )
+        from app.services.figure_renderers import render_sweep_png
+
+        brief  = sized_store.state.sizing.brief
+        coeffs = get_closest_textbook(
+            brief.classification_name, brief.payload_mass_kg * 5,
+        )
+        param = next(
+            p for p in sweepable_parameters_for(brief)
+            if p.field_name == "payload_mass_kg"
+        )
+        sweep = run_oat_sweep(brief, coeffs, param, n_points=11)
+        png = render_sweep_png(
+            sweep, ["mtow_kg", "wing_area_m2", "engine_power_w"],
+            brief.propulsion_type,
+            DisplayConverter(sized_store.settings),
+        )
+        assert png is not None and len(png) > 1000
+
+    def test_render_tornado_empty_returns_none(self, sized_store):
+        from app.core.sensitivity import TornadoData
+        from app.services.figure_renderers import render_tornado_png
+
+        empty = TornadoData(output_id="mtow_kg", baseline_out=None, bars=())
+        png = render_tornado_png(
+            empty, sized_store.state.sizing.brief.propulsion_type,
+            DisplayConverter(sized_store.settings),
+        )
+        assert png is None

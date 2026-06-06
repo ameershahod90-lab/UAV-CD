@@ -23,9 +23,10 @@ import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar, Generic, Optional, TypeVar
 
 if TYPE_CHECKING:
+    from app.core.entities import DesignBrief
     from app.core.reports.renderer import ReportBuilder
 
 
@@ -40,6 +41,48 @@ class SectionCategory(Enum):
 
 
 # ===========================================================================
+# Section Config  (abstract base for per-section export customisation)
+# ===========================================================================
+
+class SectionConfig(ABC):
+    """Abstract base for per-section export customisation payloads.
+
+    Concrete subclasses are frozen dataclasses that carry the user's
+    customisation knobs for one section. The base defines the contract
+    every customisable section's config must honour:
+
+      * ``validate(brief)`` — drop choices that don't apply to the
+        current configuration (e.g. propulsion-gated outputs whose
+        ``is_included`` predicate returns False). Default behaviour is
+        a no-op; override when the config references propulsion- or
+        mission-gated entities.
+
+      * ``summary()`` — return a one-line human-readable description for
+        the export dialog's badge ("3 tornados · 2 sweeps · margins").
+
+    Sections that are not customisable do NOT subclass SectionConfig —
+    they simply leave ``ReportSection.default_config`` returning ``None``.
+    """
+
+    def validate(self, brief: "DesignBrief") -> "SectionConfig":
+        """Return a copy of this config with any context-invalid choices
+        removed. Default: pass through unchanged."""
+        return self
+
+    def summary(self) -> str:
+        """One-line description for the customise-badge in the export dialog."""
+        return "(customised)"
+
+
+# ``T_Config`` parameterises ``ReportSection`` so customisable sections
+# get a precisely-typed ``self._config`` instead of falling back to
+# ``Optional[Any]``. PEP 696 default = ``SectionConfig`` lets the 13
+# non-customisable existing sections keep their unparameterised
+# ``class XSection(ReportSection):`` declarations.
+T_Config = TypeVar("T_Config", bound=SectionConfig, default=SectionConfig)
+
+
+# ===========================================================================
 # Section Entry  (user-facing manifest item)
 # ===========================================================================
 
@@ -49,12 +92,16 @@ class SectionEntry:
     Represents one section in the user's export manifest.
 
     The user can toggle `enabled` and adjust `order` via the export dialog.
-    `section_id` links back to a registered ReportSection subclass.
+    ``section_id`` links back to a registered ReportSection subclass.
+    ``config`` holds the user's customisation payload (typed via the
+    ``SectionConfig`` base hierarchy) when the section is customisable;
+    ``None`` means "use the section's ``default_config()``".
     """
 
     section_id: str
     enabled: bool = True
     order: int    = 0    # copied from ReportSection.default_order initially
+    config: Optional[SectionConfig] = None
 
 
 # ===========================================================================
@@ -196,28 +243,42 @@ class ReportContext:
 # ReportSection  (abstract base)
 # ===========================================================================
 
-class ReportSection(ABC):
+class ReportSection(ABC, Generic[T_Config]):
     """
     Abstract base class for all report sections.
 
     Class-level mandatory metadata
     ───────────────────────────────
-    section_id    : str   — unique snake_case identifier
-    title         : str   — human-readable heading
-    default_order : int   — position (use multiples of 10 for easy insertion)
-    category      : SectionCategory
-    description   : str   — one-liner shown as tooltip in the export dialog
+    section_id      : str   — unique snake_case identifier
+    title           : str   — human-readable heading
+    default_order   : int   — position (use multiples of 10 for easy insertion)
+    category        : SectionCategory
+    description     : str   — one-liner shown as tooltip in the export dialog
 
     Class-level optional metadata
     ──────────────────────────────
-    depends_on    : tuple[str, ...] — section_ids this section requires
-    min_version   : str             — first app version supporting this section
+    is_customizable : bool                — when True, the export dialog
+                                            renders a "Customize…" button
+                                            next to the section row. Default
+                                            False. Override + define a
+                                            concrete ``T_Config`` subclass to
+                                            opt in.
+    depends_on      : tuple[str, ...]     — section_ids this section requires
+    min_version     : str                 — first app version supporting this
 
-    Abstract method
-    ───────────────
-    build(ctx, rb) → None
-        Populate *rb* (a ReportBuilder) with this section's content.
-        This is the only method subclasses MUST implement.
+    Instance / class methods
+    ────────────────────────
+    __init__(config) :  Per-export construction with the user's customisation
+                        payload (or ``None`` to use ``default_config(ctx)``).
+                        Non-customisable sections simply ignore ``config``.
+
+    default_config(ctx) -> Optional[T_Config] :
+                        Build the default config when none is provided.
+                        Override only for customisable sections.
+
+    build(ctx, rb) -> None :
+                        Populate *rb* (a ReportBuilder) with this section's
+                        content. The only method subclasses MUST implement.
 
     Auto-registration
     ─────────────────
@@ -233,8 +294,20 @@ class ReportSection(ABC):
     description:   ClassVar[str]
 
     # ── Optional metadata ─────────────────────────────────────────────────
-    depends_on:  ClassVar[tuple[str, ...]] = ()
-    min_version: ClassVar[str] = "1.0"
+    is_customizable: ClassVar[bool] = False
+    depends_on:      ClassVar[tuple[str, ...]] = ()
+    min_version:     ClassVar[str] = "1.0"
+
+    # ── Construction ──────────────────────────────────────────────────────
+    def __init__(self, config: Optional[T_Config] = None) -> None:
+        self._config: Optional[T_Config] = config
+
+    # ── Default config hook (override in customisable subclasses) ─────────
+    @classmethod
+    def default_config(cls, ctx: "ReportContext") -> Optional[T_Config]:
+        """Build the default config for an export. Non-customisable
+        sections return ``None`` (the default)."""
+        return None
 
     # ── Auto-registration hook ────────────────────────────────────────────
     def __init_subclass__(cls, **kwargs: object) -> None:
