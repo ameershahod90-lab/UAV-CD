@@ -120,12 +120,12 @@ QDoubleSpinBox[state="error"], QSpinBox[state="error"] {
     border-color: #e74c3c;
     background-color: #3d1a1a;
 }
-QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button {
     background: #3a3a5c;
     border: none;
     width: 16px;
 }
-QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover, QSpinBox::up-button:hover, QSpinBox::down-button:hover {
     background: #7c6af7;
 }
 
@@ -177,6 +177,35 @@ QPushButton#SecondaryButton {
     color: #b0b0d8;
 }
 QPushButton#SecondaryButton:hover { border-color: #7c6af7; color: #e0e0f0; }
+
+/* Compact icon-only buttons used inside list rows. Padding is dropped
+   to almost zero so they don't overflow their host row. */
+QPushButton#IconButton {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #b0b0d8;
+    padding: 2px 4px;
+    min-width: 0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+QPushButton#IconButton:hover { border-color: #7c6af7; color: #e0e0f0; }
+QPushButton#IconButton:pressed { background: #2a2a3e; }
+QPushButton#DangerIconButton {
+    background: transparent;
+    border: 1px solid #5a5a8a;
+    color: #c0c0d8;
+    padding: 2px 4px;
+    min-width: 0;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+QPushButton#DangerIconButton:hover {
+    border-color: #e74c3c;
+    color: #ff6b6b;
+}
+QPushButton#DangerIconButton:pressed { background: #3d1a1a; }
 
 /* ── Slider ──────────────────────────────────────────────────────────── */
 QSlider::groove:horizontal {
@@ -368,6 +397,14 @@ QDoubleSpinBox, QSpinBox, QLineEdit, QTextEdit {
 }
 QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus { border-color: #6c5ce7; }
 QDoubleSpinBox[state="error"] { border-color: #e74c3c; background-color: #fff0f0; }
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button {
+    background: #c0c0d8;
+    border: none;
+    width: 16px;
+}
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover, QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background: #7c6af7;
+}
 
 QComboBox {
     background-color: #ffffff; border: 1px solid #c0c0d8;
@@ -400,6 +437,33 @@ QPushButton#SecondaryButton {
 }
 QPushButton#SecondaryButton:hover { border-color: #6c5ce7; color: #1a1a2e; }
 
+QPushButton#IconButton {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #444466;
+    padding: 2px 4px;
+    min-width: 0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+QPushButton#IconButton:hover { border-color: #6c5ce7; color: #1a1a2e; }
+QPushButton#IconButton:pressed { background: #e0e0ee; }
+QPushButton#DangerIconButton {
+    background: transparent;
+    border: 1px solid #aaaacc;
+    color: #555577;
+    padding: 2px 4px;
+    min-width: 0;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+QPushButton#DangerIconButton:hover {
+    border-color: #e74c3c;
+    color: #c0392b;
+}
+QPushButton#DangerIconButton:pressed { background: #ffdada; }
+
 QSlider::groove:horizontal { height: 4px; background: #d0d0e0; border-radius: 2px; }
 QSlider::handle:horizontal {
     background: #6c5ce7; width: 14px; height: 14px;
@@ -417,7 +481,7 @@ QMenu::item:selected { background-color: #6c5ce7; color: #ffffff; }
 
 QStatusBar { background-color: #eeeef8; color: #888aaa; border-top: 1px solid #d0d0e0; font-size: 12px; }
 QGroupBox { border: 1px solid #d0d0e0; border-radius: 6px; margin-top: 10px; padding-top: 8px; }
-QGroupBox::title { color: #666688; left: 10px; }
+QGroupBox::title { subcontrol-origin: margin; color: #666688; left: 10px; }
 QComboBox QAbstractItemView {
     background-color: #ffffff; border: 1px solid #c0c0d8;
     selection-background-color: #6c5ce7; color: #1a1a2e;

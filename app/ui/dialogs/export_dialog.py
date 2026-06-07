@@ -23,7 +23,6 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -56,6 +55,7 @@ import app.core.reports.sections  # noqa: F401
 from app.services.export_service import ExportService
 from app.state.store import AppStore
 from app.ui.dialogs.section_customize_dialog import SectionCustomizeDialog
+from app.ui.widgets.checkmark_box import CheckmarkBox
 
 _LOG = logging.getLogger(__name__)
 
@@ -88,7 +88,8 @@ class _ExportWorker(QObject):
 # ===========================================================================
 
 class _SectionRow(QWidget):
-    """One row in the sections list: grip + checkbox + customise + badge.
+    """One row in the sections list: grip + checkbox + summary + optional
+    customise button + category badge.
 
     Customisable sections (``cls.is_customizable == True``) carry a
     "⚙ Customise…" button that fires ``customise_requested(entry)``;
@@ -124,8 +125,11 @@ class _SectionRow(QWidget):
         )
         layout.addWidget(grip)
 
-        # Checkbox with section title
-        self._check = QCheckBox(title)
+        # CheckmarkBox carrying the section title — drop-in QCheckBox
+        # subclass with the checkmark-only visual (see app/ui/widgets/
+        # checkmark_box.py). All standard QCheckBox interactions still
+        # work: click to toggle, space-bar when focused, etc.
+        self._check = CheckmarkBox(title)
         self._check.setChecked(entry.enabled)
         self._check.setToolTip(description)
         self._check.toggled.connect(self._on_toggle)
@@ -140,13 +144,15 @@ class _SectionRow(QWidget):
         self._refresh_summary_badge()
         layout.addWidget(self._summary_lbl)
 
-        # Customise button — only shown for sections that opt in
+        # Customise button — only shown for sections that opt in.
         if is_customizable:
-            customise_btn = QPushButton("⚙  Customise…")
-            customise_btn.setObjectName("SecondaryButton")
+            customise_btn = QPushButton("⚙")
+            customise_btn.setObjectName("IconButton")
+            customise_btn.setFixedSize(26, 22)
             customise_btn.setToolTip(
                 f"Customise the {title} section's content."
             )
+            customise_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             customise_btn.clicked.connect(
                 lambda: self.customise_requested.emit(self._entry)
             )
@@ -212,15 +218,41 @@ class ExportDialog(QDialog):
         self._thread: Optional[QThread]   = None
 
         self.setWindowTitle("Export Report")
-        self.setMinimumWidth(520)
-        self.setMinimumHeight(620)
+        # 560 (was 520) — eliminates the horizontal scrollbar the user
+        # reported on the section row when the customise button and
+        # category badge were present at the same time.
+        self.setMinimumWidth(560)
+        self.setMinimumHeight(640)
         self._build_ui()
 
     # ── UI construction ───────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        # Outer dialog layout: scroll wrapper + persistent button row.
+        # The user reported that on shorter viewports the action buttons
+        # (Move Up / Move Down / Select All / Select None) appeared to
+        # overlap the last visible section row. The list's flexible
+        # height was pushing them out of view. Wrapping the content in a
+        # QScrollArea ensures any overflow scrolls cleanly.
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(scroll.Shape.NoFrame)
+        # Vertical-scroll-only — horizontal scroll on the export dialog
+        # body adds no value and clutters small viewports.
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff,
+        )
+        content = QWidget()
+        scroll.setWidget(content)
+        root.addWidget(scroll, stretch=1)
+
+        layout = QVBoxLayout(content)
         layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
 
         # ── Metadata group ────────────────────────────────────────────────
         meta_group = QGroupBox("Report Metadata")
@@ -258,8 +290,8 @@ class ExportDialog(QDialog):
         # ── Options ───────────────────────────────────────────────────────
         opts_group = QGroupBox("Options")
         opts_layout = QVBoxLayout(opts_group)
-        self._eq_check  = QCheckBox("Include equation blocks")
-        self._ref_check = QCheckBox("Include Sadraey section/equation references")
+        self._eq_check  = CheckmarkBox("Include equation blocks")
+        self._ref_check = CheckmarkBox("Include Sadraey section/equation references")
         self._eq_check.setChecked(True)
         self._ref_check.setChecked(True)
         opts_layout.addWidget(self._eq_check)
@@ -271,6 +303,7 @@ class ExportDialog(QDialog):
             "Sections  —  ☑ to include  •  ⠿ drag or ▲/▼ buttons to reorder"
         )
         sec_outer = QVBoxLayout(sec_group)
+        sec_outer.setSpacing(8)
 
         self._list = QListWidget()
         self._list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
@@ -282,7 +315,14 @@ class ExportDialog(QDialog):
         self._populate_sections()
         sec_outer.addWidget(self._list)
 
-        btn_row = QHBoxLayout()
+        # Section action buttons sit on a real widget BELOW the list so
+        # the layout never lets the QListWidget overflow on top of them
+        # (the user reported the buttons appearing to float above the
+        # last list row on shorter viewports).
+        btn_widget = QWidget()
+        btn_row = QHBoxLayout(btn_widget)
+        btn_row.setContentsMargins(0, 4, 0, 0)
+        btn_row.setSpacing(6)
         up_btn   = QPushButton("▲  Move Up")
         down_btn = QPushButton("▼  Move Down")
         all_btn  = QPushButton("✓  Select All")
@@ -293,16 +333,18 @@ class ExportDialog(QDialog):
         none_btn.clicked.connect(lambda: self._set_all(False))
         for b in [up_btn, down_btn, all_btn, none_btn]:
             btn_row.addWidget(b)
-        sec_outer.addLayout(btn_row)
+        sec_outer.addWidget(btn_widget)
         layout.addWidget(sec_group)
 
-        # ── Progress ──────────────────────────────────────────────────────
+        # ── Progress (inside the scrollable body) ─────────────────────────
         self._progress = QProgressBar()
         self._progress.setRange(0, 0)   # indeterminate
         self._progress.hide()
         layout.addWidget(self._progress)
 
-        # ── Buttons ───────────────────────────────────────────────────────
+        # ── Persistent footer (OUTSIDE the scroll area) ───────────────────
+        # Export / Cancel always pinned to the bottom of the dialog so
+        # they remain visible regardless of how the user scrolls the body.
         btn_box = QDialogButtonBox()
         self._export_btn = btn_box.addButton(
             "Export ▶", QDialogButtonBox.ButtonRole.AcceptRole
@@ -310,7 +352,11 @@ class ExportDialog(QDialog):
         cancel_btn = btn_box.addButton(QDialogButtonBox.StandardButton.Cancel)
         self._export_btn.clicked.connect(self._export)
         cancel_btn.clicked.connect(self.reject)
-        layout.addWidget(btn_box)
+        footer = QWidget()
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(12, 8, 12, 12)
+        footer_layout.addWidget(btn_box)
+        root.addWidget(footer)
 
     def _populate_sections(self, selected_row: int = -1) -> None:
         """

@@ -10,7 +10,6 @@ from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -37,6 +36,7 @@ from app.core.enums import (
 )
 from app.core.units import cascade_unit_system
 from app.state.store import AppStore
+from app.ui.widgets.checkmark_box import CheckmarkBox
 from app.ui.widgets.enum_combo import EnumCombo
 
 import dataclasses
@@ -114,7 +114,7 @@ class SettingsTab(QWidget):
         self._max_iter.setRange(10, 10_000)
         self._max_iter.setValue(s.max_iterations)
         solver_form.addRow("Max Iterations:", self._max_iter)
-        self._auto_calc = QCheckBox("Auto-recalculate on input change")
+        self._auto_calc = CheckmarkBox("Auto-recalculate on input change")
         self._auto_calc.setChecked(s.auto_recalculate)
         solver_form.addRow(self._auto_calc)
         main.addWidget(solver_box)
@@ -167,7 +167,7 @@ class SettingsTab(QWidget):
         db_row.addWidget(self._db_path, stretch=1)
         db_row.addWidget(browse_btn)
         db_form.addRow("CSV Path:", db_row)
-        self._use_hist = QCheckBox(
+        self._use_hist = CheckmarkBox(
             "Use historical data for regression (geometry scaling laws)"
         )
         self._use_hist.setToolTip(

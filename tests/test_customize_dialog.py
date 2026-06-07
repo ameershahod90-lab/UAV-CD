@@ -79,8 +79,10 @@ class TestSectionCustomizeDialogBase:
 class TestSensitivityReportConfigDialog:
     def test_constructs_with_no_initial_config(self, sized_store):
         dlg = SensitivityReportConfigDialog(sized_store, initial_config=None)
-        # Sanity: dialog widgets exist after _setup_layout
-        assert dlg._tornado_list.count() > 0
+        # Sanity: dialog widgets exist after _setup_layout — tornado picks
+        # are now a list of (output_id, CheckmarkBox) tuples, not a
+        # QListWidget of checkable items.
+        assert len(dlg._tornado_checks) > 0
         # No sweep rows by default
         assert dlg._sweep_rows == []
         # Tables ON by default

@@ -30,7 +30,6 @@ from PyQt6.QtCore import QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QCursor, QMouseEvent
 from PyQt6.QtWidgets import (
     QButtonGroup,
-    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -47,6 +46,7 @@ from app.core.entities import (
 )
 from app.core.enums import EnergySource, PropulsionType, SegmentType
 from app.core.validation import get_field_spec
+from app.ui.widgets.checkmark_box import CheckmarkBox
 from app.ui.widgets.validated_input import ValidatedInput
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ class MissionSegmentWidget(QFrame):
             row.addWidget(spacer)
 
         # ── Enable / disable checkbox ────────────────────────────────────
-        self._enabled_cb = QCheckBox()
+        self._enabled_cb = CheckmarkBox()
         self._enabled_cb.setChecked(seg.enabled)
         self._enabled_cb.setToolTip("Enable / disable this segment")
         self._enabled_cb.toggled.connect(self._on_enabled_changed)
